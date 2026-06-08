@@ -1,0 +1,1 @@
+gcloud run deploy leerlevels-figuremaker --source . --region europe-west4 --allow-unauthenticated --memory 4G --timeout 1200 --min-instances 0 --max-instances 5 --service-account  leerlevels-figure@joost-koch.iam.gserviceaccount.com --project joost-koch

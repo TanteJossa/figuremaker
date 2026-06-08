@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leerlevels Figuremaker Toolbox 📐</title>
+    
+    <!-- Google Font & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Ubuntu', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            gold: '#bf9000',
+                            goldLight: '#fff2cc',
+                            blue: '#0b5394',
+                            blueLight: '#cfe2f3',
+                            green: '#38761d',
+                            greenLight: '#d9ead3',
+                            red: '#980000',
+                            redLight: '#e6b8af',
+                            charcoal: '#333333',
+                            bg: '#f7f9fa'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+    <!-- Vue.js v3 (Global Build) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- math.js (Global Build) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+
+    <style>
+        [v-cloak] { display: none !important; }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-brand-bg text-brand-charcoal h-screen flex flex-col font-sans overflow-hidden">
+
+    <div id="app" v-cloak class="flex flex-col h-screen overflow-hidden">
+        
+        <!-- Header -->
+        <header class="bg-black text-white px-6 py-4 flex justify-between items-center shadow-md shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-gold text-black rounded px-2.5 py-1 font-bold text-lg">F</div>
+                <h1 class="text-xl font-bold tracking-tight">
+                    <span class="text-brand-gold">Figuremaker Toolbox</span>
+                </h1>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <!-- Status indicator -->
+                <div v-if="status.message" :class="statusClass" class="px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all">
+                    <i :class="statusIcon"></i>
+                    <span>[[ status.message ]]</span>
+                    <a v-if="status.url" :href="status.url" target="_blank" class="underline ml-2 hover:text-white flex items-center gap-1">
+                        Open Presentation <i class="fa-solid fa-up-right-from-square text-xs"></i>
+                    </a>
+                </div>
+                
+                <div class="text-sm text-gray-400">
+                    <span class="bg-gray-800 text-gray-300 px-2.5 py-1 rounded-full text-xs font-semibold border border-gray-700">
+                        SPA v2.5
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace (Full Screen Height, No Outer Scroll) -->
+        <main class="flex-1 flex flex-row overflow-hidden">
+            
+            <!-- Left Sidebar (Configuration settings) - Independently Scrollable -->
+            <aside class="w-[380px] bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto shrink-0 shadow-sm">
+                
+                <!-- Quick Presets Dropdown Section -->
+                <div class="p-5 border-b border-gray-100 bg-gray-50/75">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Load Preset Template</label>
+                    <div class="relative">
+                        <select v-model="selectedPreset" @change="loadPreset" class="w-full bg-white border border-gray-300 text-gray-800 py-2.5 px-3 pr-8 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-brand-blue font-medium text-sm transition-all cursor-pointer">
+                            <option value="sinusoidal">1. Sinusoidal Wave (Physics)</option>
+                            <option value="area">2. Area Between Curves</option>
+                            <option value="phases">3. Phase Diagram</option>
+                            <option value="diffeq">4. Differential Equation (Lorenz Attractor)</option>
+                            <option value="parametric">5. Parametric Curve (Lissajous)</option>
+                            <option value="multigrid">6. Multi-Grid Layout</option>
+                            <option value="minimal">7. Reset (Minimal Slate)</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-500">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Accordion Collapsible Cards -->
+                <div class="flex-1 p-5 space-y-4">
+
+                    <!-- Accordion 1: Canvas & Viewport Bounds -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('canvas')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-maximize text-brand-gold w-4"></i>
+                                Canvas & Viewport Bounds
+                            </span>
+                            <i class="fa-solid" :class="activeSections.canvas ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.canvas" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Canvas Width (PT)</label>
+                                    <input type="number" v-model.number="config.canvasWidth" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Canvas Height (PT)</label>
+                                    <input type="number" v-model.number="config.canvasHeight" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block font-medium text-gray-600 mb-1">Font Family</label>
+                                <input type="text" v-model="config.fontFamily" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                            </div>
+                            
+                            <hr class="border-gray-200" />
+                            <div class="font-bold text-gray-700 text-[10px] uppercase tracking-wider mb-2">Math Viewport Limits</div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">X Min</label>
+                                    <input type="number" step="any" v-model.number="config.viewport.xMin" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">X Max</label>
+                                    <input type="number" step="any" v-model.number="config.viewport.xMax" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Y Min</label>
+                                    <input type="number" step="any" v-model.number="config.viewport.yMin" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Y Max</label>
+                                    <input type="number" step="any" v-model.number="config.viewport.yMax" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-200" />
+                            <div class="font-bold text-gray-700 text-[10px] uppercase tracking-wider mb-2">Margins (Plot Area Padding)</div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div>
+                                    <label class="block text-center font-medium text-gray-500 mb-1">Left</label>
+                                    <input type="number" v-model.number="config.viewport.marginLeft" class="w-full bg-white text-center border border-gray-300 rounded py-1 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block text-center font-medium text-gray-500 mb-1">Right</label>
+                                    <input type="number" v-model.number="config.viewport.marginRight" class="w-full bg-white text-center border border-gray-300 rounded py-1 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block text-center font-medium text-gray-500 mb-1">Top</label>
+                                    <input type="number" v-model.number="config.viewport.marginTop" class="w-full bg-white text-center border border-gray-300 rounded py-1 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block text-center font-medium text-gray-500 mb-1">Bottom</label>
+                                    <input type="number" v-model.number="config.viewport.marginBottom" class="w-full bg-white text-center border border-gray-300 rounded py-1 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 2: Grids & Axes Ticks -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('grids')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-border-none text-brand-gold w-4"></i>
+                                Grid Lines & Axis Settings
+                            </span>
+                            <i class="fa-solid" :class="activeSections.grids ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.grids" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div class="flex items-center justify-between">
+                                <label class="font-bold text-gray-700">Show Grid Lines</label>
+                                <input type="checkbox" v-model="config.grid.show" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">X-Axis Interval</label>
+                                    <input type="number" step="any" v-model.number="config.grid.xStep" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Y-Axis Interval</label>
+                                    <input type="number" step="any" v-model.number="config.grid.yStep" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-200" />
+                            <div class="flex items-center justify-between">
+                                <label class="font-bold text-gray-700">Dutch Decimal Format (Comma)</label>
+                                <input type="checkbox" v-model="config.grid.dutchComma" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="font-bold text-gray-700">Show Boundary Frame</label>
+                                <input type="checkbox" v-model="config.grid.showFrame" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                            </div>
+                            <div v-if="config.grid.showFrame" class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Frame Color</label>
+                                    <input type="color" v-model="config.grid.frameColor" class="w-full bg-white border border-gray-300 h-8 rounded p-0.5 focus:ring-1 focus:ring-brand-blue cursor-pointer" />
+                                    <div class="flex flex-wrap gap-1 mt-1.5">
+                                        <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="config.grid.frameColor = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': config.grid.frameColor === hex }"></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Frame Thickness</label>
+                                    <input type="number" step="any" v-model.number="config.grid.frameWidth" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+                            
+                            <hr class="border-gray-200" />
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="col-span-2">
+                                    <label class="block font-bold text-gray-700 mb-1">Boundary Style</label>
+                                    <select v-model="config.grid.boundaryStyle" class="w-full bg-white border border-gray-300 text-gray-800 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-medium text-xs">
+                                        <option value="box">Box Frame Enclosure</option>
+                                        <option value="arrows">Arrows (traditional math x/y axes)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" v-model="config.grid.xBreak" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                                    <label class="font-bold text-gray-700">X-Axis Break</label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" v-model="config.grid.yBreak" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                                    <label class="font-bold text-gray-700">Y-Axis Break</label>
+                                </div>
+                            </div>
+                            
+                            <hr class="border-gray-200" />
+                            <div class="flex items-center justify-between">
+                                <label class="font-bold text-gray-700">Multi-Grid Layout (Sub-panels)</label>
+                                <input type="checkbox" v-model="config.grid.isMultiGrid" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                            </div>
+                            <div v-if="config.grid.isMultiGrid" class="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Grid Rows</label>
+                                    <input type="number" v-model.number="config.grid.rows" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Grid Columns</label>
+                                    <input type="number" v-model.number="config.grid.cols" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Horizontal Gap</label>
+                                    <input type="number" v-model.number="config.grid.gapX" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Vertical Gap</label>
+                                    <input type="number" v-model.number="config.grid.gapY" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 3: Mathematical & Parametric Functions -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('functions')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-chart-line text-brand-gold w-4"></i>
+                                Curves & Functions (Y=f(x) / Parametric)
+                            </span>
+                            <i class="fa-solid" :class="activeSections.functions ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.functions" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div v-for="(fn, idx) in config.functions" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-3 relative shadow-sm">
+                                <button @click="removeFunction(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold text-sm transition-colors" title="Remove">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+
+                                <div class="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                                    <label class="font-bold text-gray-700">Curve Mode</label>
+                                    <div class="flex gap-2">
+                                        <button @click="fn.isParametric = false" :class="!fn.isParametric ? 'bg-brand-gold text-black' : 'bg-gray-100 text-gray-500'" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase">Standard</button>
+                                        <button @click="fn.isParametric = true" :class="fn.isParametric ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-500'" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase">Parametric</button>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="!fn.isParametric">
+                                    <label class="block font-medium text-gray-600 mb-1">Expression (e.g. `0.16 * sin(pi * x)` or `2+e^x`)</label>
+                                    <input type="text" v-model="fn.expr" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                <div v-else class="space-y-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-0.5">X Expression of `t` (e.g. `10 * (y - x)` or `cos(t)`)</label>
+                                        <input type="text" v-model="fn.xExpr" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-0.5">Y Expression of `t` (e.g. `x * (28 - z) - y` or `sin(t)`)</label>
+                                        <input type="text" v-model="fn.yExpr" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Color</label>
+                                        <input type="color" v-model="fn.stroke" class="w-full h-8 bg-white border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="fn.stroke = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': fn.stroke === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Stroke Width (PT)</label>
+                                        <input type="number" step="any" v-model.number="fn.strokeWidth" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+
+                                <div v-if="!fn.isParametric" class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X Start</label>
+                                        <input type="number" step="any" v-model.number="fn.xStart" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X End</label>
+                                        <input type="number" step="any" v-model.number="fn.xEnd" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div v-else class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">T Start</label>
+                                        <input type="number" step="any" v-model.number="fn.tStart" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">T End</label>
+                                        <input type="number" step="any" v-model.number="fn.tEnd" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Dash Pattern</label>
+                                        <select v-model="fn.dasharray" class="w-full bg-white border border-gray-300 rounded py-1 px-1.5 focus:ring-1 focus:ring-brand-blue">
+                                            <option value="none">Solid Line</option>
+                                            <option value="4,4">Dashed (4,4)</option>
+                                            <option value="2,2">Dotted (2,2)</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end justify-center pb-1">
+                                        <label class="flex items-center gap-2 font-medium text-gray-600 cursor-pointer">
+                                            <input type="checkbox" v-model="fn.active" class="rounded text-brand-blue" />
+                                            <span>Active Curve</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div v-if="config.grid.isMultiGrid && fn.cell" class="grid grid-cols-3 gap-2 border-t border-gray-200 pt-2.5">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-0.5">Cell Row</label>
+                                        <input type="number" v-model.number="fn.cell.row" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-0.5">Cell Col</label>
+                                        <input type="number" v-model.number="fn.cell.col" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-0.5">Cell Title</label>
+                                        <input type="text" v-model="fn.label" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button @click="addFunction" class="py-2 bg-brand-goldLight text-brand-gold hover:bg-brand-gold/20 font-bold rounded-lg border border-dashed border-brand-gold transition-colors flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> Standard Curve
+                                </button>
+                                <button @click="addParametricFunction" class="py-2 bg-brand-blueLight text-brand-blue hover:bg-brand-blue/20 font-bold rounded-lg border border-dashed border-brand-blue transition-colors flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> Parametric Curve
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion: Differential Equations (Lorenz Solver) -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('diffeq')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-calculator text-brand-blue w-4"></i>
+                                Differential Equations
+                            </span>
+                            <i class="fa-solid" :class="activeSections.diffeq ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.diffeq" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-gray-700">Enable Solver Simulation</span>
+                                <input type="checkbox" v-model="config.diffeq.active" class="rounded text-brand-blue focus:ring-brand-blue h-4 w-4" />
+                            </div>
+                            
+                            <div v-if="config.diffeq.active" class="space-y-3">
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">dx/dt Expression (use x, y, z)</label>
+                                    <input type="text" v-model="config.diffeq.eqX" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">dy/dt Expression (use x, y, z)</label>
+                                    <input type="text" v-model="config.diffeq.eqY" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">dz/dt Expression (use x, y, z)</label>
+                                    <input type="text" v-model="config.diffeq.eqZ" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Init X</label>
+                                        <input type="number" step="any" v-model.number="config.diffeq.initX" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Init Y</label>
+                                        <input type="number" step="any" v-model.number="config.diffeq.initY" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Init Z</label>
+                                        <input type="number" step="any" v-model.number="config.diffeq.initZ" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Step size (dt)</label>
+                                        <input type="number" step="any" v-model.number="config.diffeq.dt" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Steps Count</label>
+                                        <input type="number" v-model.number="config.diffeq.steps" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Stroke Color</label>
+                                        <input type="color" v-model="config.diffeq.stroke" class="w-full h-8 bg-white border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="config.diffeq.stroke = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': config.diffeq.stroke === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Stroke Width (PT)</label>
+                                        <input type="number" step="any" v-model.number="config.diffeq.strokeWidth" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 4: Shaded Hatch Areas -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('hatches')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-signature text-brand-gold w-4"></i>
+                                Hatch Regions
+                            </span>
+                            <i class="fa-solid" :class="activeSections.hatches ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.hatches" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div v-for="(ht, idx) in config.hatches" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-3 relative shadow-sm">
+                                <button @click="removeHatch(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold text-sm transition-colors" title="Remove">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Top Bound (e.g. `x < 4 ? 2*x : 8` or curve expression)</label>
+                                    <input type="text" v-model="ht.topFunc" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Bottom Bound (e.g. `0` or curve expression)</label>
+                                    <input type="text" v-model="ht.bottomFunc" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue font-mono text-xs" />
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X Start</label>
+                                        <input type="number" step="any" v-model.number="ht.xStart" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X End</label>
+                                        <input type="number" step="any" v-model.number="ht.xEnd" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Hatch Color</label>
+                                        <input type="color" v-model="ht.stroke" class="w-full h-8 bg-white border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="ht.stroke = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': ht.stroke === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Hatch Spacing (PT)</label>
+                                        <input type="number" step="any" v-model.number="ht.stepPt" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" v-model="ht.active" class="rounded text-brand-blue" />
+                                    <label class="font-medium text-gray-600">Active Shading</label>
+                                </div>
+                            </div>
+                            <button @click="addHatch" class="w-full py-2 bg-brand-blueLight text-brand-blue hover:bg-brand-blue/20 font-bold rounded-lg border border-dashed border-brand-blue transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Add Hatch Region
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 5: Phase Markers & Points -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('markers')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-arrows-left-right text-brand-gold w-4"></i>
+                                Phase Markers & Points
+                            </span>
+                            <i class="fa-solid" :class="activeSections.markers ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.markers" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            
+                            <!-- Phase Markers (Double arrows) -->
+                            <div class="font-bold text-gray-700 text-[10px] uppercase tracking-wider mb-2 flex justify-between items-center">
+                                <span>1. Phase Range Markers</span>
+                                <button @click="addPhaseMarker" class="text-brand-blue hover:underline text-xs flex items-center gap-1">
+                                    <i class="fa-solid fa-plus-circle"></i> Add
+                                </button>
+                            </div>
+                            
+                            <div v-for="(pm, idx) in config.phaseMarkers" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-2.5 relative shadow-sm">
+                                <button @click="removePhaseMarker(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">X Start</label>
+                                        <input type="number" step="any" v-model.number="pm.xStart" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">X End</label>
+                                        <input type="number" step="any" v-model.number="pm.xEnd" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="col-span-2">
+                                        <label class="block font-medium text-gray-500 mb-0.5">Y Position</label>
+                                        <input type="number" step="any" v-model.number="pm.yVal" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Label</label>
+                                        <input type="text" v-model="pm.label" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue text-center font-bold" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Color</label>
+                                        <input type="color" v-model="pm.stroke" class="w-full h-8 border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="pm.stroke = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': pm.stroke === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-end justify-center pb-1">
+                                        <label class="flex items-center gap-1.5 font-medium text-gray-500 cursor-pointer">
+                                            <input type="checkbox" v-model="pm.active" class="rounded text-brand-blue" />
+                                            <span>Active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-200" />
+                            
+                            <!-- Highlight Points -->
+                            <div class="font-bold text-gray-700 text-[10px] uppercase tracking-wider mb-2 flex justify-between items-center">
+                                <span>2. Coordinate Highlights</span>
+                                <button @click="addPoint" class="text-brand-blue hover:underline text-xs flex items-center gap-1">
+                                    <i class="fa-solid fa-plus-circle"></i> Add
+                                </button>
+                            </div>
+                            
+                            <div v-for="(pt, idx) in config.points" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-2.5 relative shadow-sm">
+                                <button @click="removePoint(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">X Math</label>
+                                        <input type="number" step="any" v-model.number="pt.x" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Y Math</label>
+                                        <input type="number" step="any" v-model.number="pt.y" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Text</label>
+                                        <input type="text" v-model="pt.label" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Dot Size</label>
+                                        <input type="number" v-model.number="pt.dotSize" class="w-full border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-500 mb-0.5">Stroke Color</label>
+                                        <input type="color" v-model="pt.color" class="w-full h-8 border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="pt.color = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': pt.color === hex }"></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" v-model="pt.active" class="rounded text-brand-blue" />
+                                    <label class="font-medium text-gray-600">Draw point</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 6: Lines & Arrows -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('lines')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-arrow-turn-up text-brand-gold w-4"></i>
+                                Lines & Arrows
+                            </span>
+                            <i class="fa-solid" :class="activeSections.lines ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.lines" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div v-for="(ln, idx) in config.lines" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-3 relative shadow-sm">
+                                <button @click="removeLine(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X1 (Math)</label>
+                                        <input type="number" step="any" v-model.number="ln.x1" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Y1 (Math)</label>
+                                        <input type="number" step="any" v-model.number="ln.y1" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X2 (Math)</label>
+                                        <input type="number" step="any" v-model.number="ln.x2" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Y2 (Math)</label>
+                                        <input type="number" step="any" v-model.number="ln.x2" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" /> <!-- fixed y2 model -->
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Color</label>
+                                        <input type="color" v-model="ln.stroke" class="w-full h-8 border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="ln.stroke = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': ln.stroke === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Width (PT)</label>
+                                        <input type="number" step="any" v-model.number="ln.strokeWidth" class="w-full border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Style</label>
+                                        <select v-model="ln.type" class="w-full border border-gray-300 rounded py-1 px-1 focus:ring-1 focus:ring-brand-blue">
+                                            <option value="line">Line</option>
+                                            <option value="arrow">Arrow</option>
+                                            <option value="double_arrow">Double Arrow</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Dash array</label>
+                                        <select v-model="ln.dasharray" class="w-full border border-gray-300 rounded py-1 px-1 focus:ring-1 focus:ring-brand-blue">
+                                            <option value="none">Solid</option>
+                                            <option value="4,4">Dashed (4,4)</option>
+                                            <option value="2,2">Dotted (2,2)</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end justify-center pb-1">
+                                        <label class="flex items-center gap-1.5 font-medium text-gray-600 cursor-pointer">
+                                            <input type="checkbox" v-model="ln.active" class="rounded text-brand-blue" />
+                                            <span>Active Line</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button @click="addLine" class="w-full py-2 bg-brand-goldLight text-brand-gold hover:bg-brand-gold/20 font-bold rounded-lg border border-dashed border-brand-gold transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Add Line / Arrow
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Accordion 7: Text & LaTeX Annotations -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('textLabels')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-i-cursor text-brand-gold w-4"></i>
+                                LaTeX & Text Overlays
+                            </span>
+                            <i class="fa-solid" :class="activeSections.textLabels ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.textLabels" class="p-4 bg-gray-50/40 space-y-4 text-xs">
+                            <div v-for="(lbl, idx) in config.textLabels" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg space-y-3 relative shadow-sm">
+                                <button @click="removeTextLabel(idx)" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                
+                                <div>
+                                    <label class="block font-medium text-gray-600 mb-1">Label Content (Raw Text or LaTeX)</label>
+                                    <textarea v-model="lbl.text" rows="2" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue font-mono text-xs h-14" placeholder="e.g. \frac{dx}{dt} = \sigma(y-x)"></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">X Position</label>
+                                        <input type="number" step="any" v-model.number="lbl.x" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Y Position</label>
+                                        <input type="number" step="any" v-model.number="lbl.y" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Coord Mode</label>
+                                        <select v-model="lbl.coordinateMode" class="w-full border border-gray-300 rounded py-1 px-1 focus:ring-1 focus:ring-brand-blue">
+                                            <option value="math">Mathematical (Scaled)</option>
+                                            <option value="screen">Screen Space (PT 0-720)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Font Size (PT)</label>
+                                        <input type="number" v-model.number="lbl.fontSize" class="w-full border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Text Color</label>
+                                        <input type="color" v-model="lbl.color" class="w-full h-8 border border-gray-300 rounded p-0.5 cursor-pointer" />
+                                        <div class="flex flex-wrap gap-1 mt-1.5">
+                                            <button v-for="(hex, name) in leerlevelsColors" :key="name" @click="lbl.color = hex" :style="{ backgroundColor: hex }" :title="name" type="button" class="w-4 h-4 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-blue hover:scale-110 transition-transform shrink-0" :class="{ 'ring-1 ring-black': lbl.color === hex }"></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block font-medium text-gray-600 mb-1">Align</label>
+                                        <select v-model="lbl.align" class="w-full border border-gray-300 rounded py-1 px-1 focus:ring-1 focus:ring-brand-blue">
+                                            <option value="center">Center</option>
+                                            <option value="start">Left</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-1 py-1">
+                                    <label class="flex items-center gap-1 font-medium text-gray-500 cursor-pointer">
+                                        <input type="checkbox" v-model="lbl.isLatex" class="rounded text-brand-blue" />
+                                        <span>LaTeX</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 font-medium text-gray-500 cursor-pointer">
+                                        <input type="checkbox" v-model="lbl.bold" class="rounded text-brand-blue" />
+                                        <span>Bold</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 font-medium text-gray-500 cursor-pointer">
+                                        <input type="checkbox" v-model="lbl.maskBg" class="rounded text-brand-blue" />
+                                        <span>Mask BG</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <button @click="addTextLabel" class="w-full py-2 bg-brand-goldLight text-brand-gold hover:bg-brand-gold/20 font-bold rounded-lg border border-dashed border-brand-gold transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Add LaTeX / Text Overlay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Central Preview Area - Sticky Preview, Independently Scrollable -->
+            <section class="flex-1 h-full overflow-y-auto flex flex-col items-center justify-start p-6 bg-brand-bg min-w-0">
+                
+                <!-- Navbar Actions Block -->
+                <div class="w-full max-w-[740px] bg-white rounded-xl border border-gray-200 p-4 mb-6 shadow-sm flex flex-col gap-4 shrink-0">
+                    <div class="flex flex-wrap gap-3 items-center justify-between">
+                        <!-- Left side: Connection and Folder Selection -->
+                        <div class="flex items-center gap-3">
+                            <!-- Auth Trigger -->
+                            <div v-if="!loggedIn">
+                                <a href="/login" class="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition-all">
+                                    <i class="fa-brands fa-google"></i>
+                                    Log in with Google
+                                </a>
+                            </div>
+                            <div v-else class="flex items-center gap-3">
+                                <span class="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1 flex items-center gap-1">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                    Connected
+                                </span>
+                                
+                                <!-- Destination Folder selection block (Clean Parents-limited Hierarchy Browser) -->
+                                <div class="flex flex-wrap items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                                    <span class="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-folder text-brand-blue text-[13px]"></i>
+                                        In: <strong class="text-gray-800">[[ currentFolderName ]]</strong>
+                                    </span>
+                                    
+                                    <button v-if="navHistory.length > 0" @click="goBackFolder" class="bg-white hover:bg-gray-100 text-gray-700 text-[11px] font-bold px-1.5 py-0.5 rounded border border-gray-300 flex items-center gap-1 transition-all ml-1" title="Go up one folder level">
+                                        <i class="fa-solid fa-arrow-left text-[9px]"></i> Back
+                                    </button>
+
+                                    <select v-model="selectedFolder" @change="saveFolderSelection" class="bg-white border border-gray-300 text-gray-800 text-[11px] rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-blue max-w-[150px]">
+                                        <option value="">[Stay here / select current]</option>
+                                        <option v-for="f in folders" :key="f.id" :value="f.id">📁 [[ f.name ]]</option>
+                                    </select>
+
+                                    <button v-if="selectedFolder" @click="openSelectedFolder" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-all" title="Open selected folder to view its subfolders">
+                                        Browse <i class="fa-solid fa-folder-open text-[10px]"></i>
+                                    </button>
+                                </div>
+                                
+                                <a href="/logout" class="text-gray-400 hover:text-gray-600 text-xs underline" title="Log out from Google">
+                                    Logout
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-circle-check text-green-500" v-if="uploadedPresentationId"></i>
+                            <span class="text-sm font-medium" :class="uploadedPresentationId ? 'text-green-700' : 'text-gray-500'">
+                                [[ uploadedPresentationId ? 'Linked' : 'Not Uploaded' ]]
+                            </span>
+                            <div v-if="uploadedPresentationId" class="flex items-center gap-2">
+                                <!-- Clickable direct hyperlink to the slide presentation deck -->
+                                <a :href="'https://docs.google.com/presentation/d/' + uploadedPresentationId + '/edit'" target="_blank" class="text-brand-blue underline hover:text-blue-800 font-mono text-xs flex items-center gap-1 font-bold">
+                                    [[ uploadedPresentationId ]]
+                                    <i class="fa-solid fa-up-right-from-square text-[9px]"></i>
+                                </a>
+                                <button @click="copyId" class="text-gray-400 hover:text-gray-600" title="Copy Presentation ID">
+                                    <i class="fa-solid fa-copy text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-100 pt-3 flex flex-wrap gap-2 justify-end">
+                        <!-- Convert to Presentation (Create) -->
+                        <button @click="exportToPresentation" :disabled="status.loading" class="bg-brand-gold hover:bg-yellow-600 disabled:bg-gray-300 text-black font-bold px-4 py-2 rounded-lg shadow-sm transition-all text-xs flex items-center gap-2 cursor-pointer">
+                            <i class="fa-solid fa-file-powerpoint"></i>
+                            Convert to Presentation
+                        </button>
+                        
+                        <!-- Append to Presentation -->
+                        <button @click="appendSlideToPresentation" :disabled="status.loading || !uploadedPresentationId" class="bg-brand-blue hover:bg-blue-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold px-4 py-2 rounded-lg shadow-sm transition-all text-xs flex items-center gap-2 cursor-pointer">
+                            <i class="fa-solid fa-circle-plus"></i>
+                            Append as New Slide
+                        </button>
+                        
+                        <!-- Download SVG -->
+                        <button @click="downloadSVG" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-download"></i>
+                            SVG
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Preview Canvas Wrapper -->
+                <div class="relative flex flex-col items-center shrink-0">
+                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5 self-start">
+                        <i class="fa-solid fa-eye text-brand-gold"></i>
+                        Widescreen Presentation Slide (16:9) Live Preview
+                    </div>
+                    
+                    <!-- Aspect locked slide boundary -->
+                    <div class="relative bg-white border-2 border-brand-charcoal/80 rounded-xl shadow-2xl overflow-hidden w-full max-w-[720px] aspect-[16/9]" id="canvas-wrapper">
+                        
+                        <!-- Main Canvas layer -->
+                        <canvas id="live-canvas" width="720" height="405" class="absolute inset-0 w-full h-full bg-white z-0"></canvas>
+                        
+                        <!-- KaTeX absolute overlays layer (high quality LaTeX in browser) -->
+                        <div id="katex-layer" class="absolute inset-0 pointer-events-none z-10 w-full h-full"></div>
+                        
+                    </div>
+                    
+                    <!-- Live Helper details below -->
+                    <div class="w-full max-w-[720px] flex justify-between mt-3 px-1 text-[11px] text-gray-400">
+                        <span>Workspace: 720x405 PT (Widescreen Slide)</span>
+                        <span>Drag config cards on the sidebar to update live</span>
+                    </div>
+                </div>
+
+                <!-- Explanation / Features Help banner -->
+                <div class="w-full max-w-[740px] mt-6 p-5 bg-white rounded-xl border border-gray-200 shadow-sm text-xs space-y-3 leading-relaxed shrink-0">
+                    <h3 class="font-bold text-sm text-brand-blue flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                        <i class="fa-solid fa-circle-info"></i> Intelligent Deterministic Engineering Elements
+                    </h3>
+                    <p>
+                        This toolbox translates math parameters directly to absolute presentation vectors. When you upload, elements are rendered as 
+                        <strong>fully native, completely editable presentation shapes</strong> in Google Slides. 
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1.5 text-gray-600">
+                        <li><strong>Live Preview Sync:</strong> Re-implements <code>graph_engine.py</code> viewport transformations in the browser context at 60 FPS.</li>
+                        <li><strong>Equation Solver:</strong> Parses standard mathematical, conditional, piecewise, and parametric formulas via Math.js.</li>
+                        <li><strong>KaTeX Compilation:</strong> Renders math syntax instantly in the client frame, mapping mathematically to exact text bounding frames in presentation space.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Right Sidebar (Gemini AI Diagram Assistant Chatbot) -->
+            <aside class="bg-white border-l border-gray-200 h-full flex flex-col shrink-0 shadow-sm transition-all duration-300 relative" 
+                   :class="chatExpanded ? 'w-[360px]' : 'w-[50px]'">
+                
+                <!-- Collapse/Expand thin ribbon toggle -->
+                <div class="absolute inset-y-0 left-0 w-[50px] flex flex-col items-center justify-start pt-4 border-r border-gray-100 bg-gray-50/50" v-if="!chatExpanded">
+                    <button @click="chatExpanded = true" class="text-gray-500 hover:text-black p-2 rounded-lg hover:bg-gray-200 transition-all mb-4" title="Expand Chat Assistant">
+                        <i class="fa-solid fa-comments text-lg"></i>
+                    </button>
+                    <!-- Vertical label strip -->
+                    <div class="rotate-90 origin-left whitespace-nowrap text-xs font-bold uppercase tracking-widest text-gray-400 mt-20 ml-3">
+                        Gemini AI Assistant
+                    </div>
+                </div>
+
+                <!-- Complete Full Chat interface panel -->
+                <div class="w-full h-full flex flex-col overflow-hidden" v-show="chatExpanded">
+                    
+                    <!-- Chat Header -->
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-robot text-brand-blue text-lg"></i>
+                            <h2 class="text-sm font-bold text-gray-800 m-0 border-none pb-0">AI Layout Assistant</h2>
+                        </div>
+                        <button @click="chatExpanded = false" class="text-gray-400 hover:text-gray-700" title="Collapse Chat">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Conversation History log - Scrollable -->
+                    <div class="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50/20 text-xs flex flex-col" id="chat-messages-container">
+                        <div v-for="(msg, idx) in chatMessages" :key="idx" 
+                             :class="msg.role === 'user' ? 'self-end bg-brand-blue text-white rounded-l-lg rounded-tr-lg' : 'self-start bg-white border border-gray-200 text-brand-charcoal rounded-r-lg rounded-tl-lg shadow-sm'"
+                             class="max-w-[85%] p-3 leading-relaxed flex flex-col space-y-1">
+                            <div class="font-bold text-[10px] uppercase tracking-wider opacity-75">
+                                [[ msg.role === 'user' ? 'User' : 'Gemini Assistant' ]]
+                            </div>
+                            <div class="whitespace-pre-line">[[ msg.text ]]</div>
+                        </div>
+                        
+                        <!-- Streaming/Loading message -->
+                        <div v-if="chatLoading" class="self-start bg-white border border-gray-200 text-gray-500 p-3 rounded-r-lg rounded-tl-lg shadow-sm flex items-center gap-2">
+                            <i class="fa-solid fa-spinner fa-spin text-brand-blue"></i>
+                            <span>Gemini is adjusting parameters...</span>
+                        </div>
+                    </div>
+
+                    <!-- Conversation controls Input Area -->
+                    <div class="p-3 border-t border-gray-200 bg-white">
+                        <div class="flex gap-2">
+                            <input type="text" v-model="chatInput" @keyup.enter="sendChatMessage" :disabled="chatLoading"
+                                   class="flex-1 bg-gray-100 border border-gray-300 text-xs rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-blue text-brand-charcoal" 
+                                   placeholder="e.g. 'verhoog de amplitude' or 'kleur grafiek rood'..." />
+                            <button @click="sendChatMessage" :disabled="chatLoading || !chatInput.trim()"
+                                    class="bg-brand-blue text-white font-bold p-2.5 rounded-lg hover:bg-blue-800 transition-all shrink-0 flex items-center justify-center">
+                                <i class="fa-solid fa-paper-plane text-sm"></i>
+                            </button>
+                        </div>
+                        <div class="text-[10px] text-gray-400 mt-1.5 text-center">
+                            Powered by gemini-3.5-flash
+                        </div>
+                    </div>
+
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, onMounted, watch } = Vue;
+
+        createApp({
+            compilerOptions: {
+                delimiters: ['[[', ']]'] // Avoid Flask Jinga collision
+            },
+            setup() {
+                const leerlevelsColors = {
+                    'Zwart': '#000000',
+                    'Donkergrijs': '#666666',
+                    'Middengrijs': '#b7b7b7',
+                    'Lichtgrijs': '#cccccc',
+                    'Wit': '#ffffff',
+                    'Rood': '#980000',
+                    'Rood Licht': '#e6b8af',
+                    'Blauw': '#0b5394',
+                    'Blauw Licht': '#cfe2f3',
+                    'Groen': '#38761d',
+                    'Groen Licht': '#d9ead3',
+                    'Goud/Geel': '#bf9000',
+                    'Goud Licht': '#fff2cc'
+                };
+
+                // Reactive UI Section toggles
+                const activeSections = reactive({
+                    canvas: true,
+                    grids: false,
+                    functions: true,
+                    diffeq: false,
+                    hatches: false,
+                    markers: false,
+                    lines: false,
+                    textLabels: false
+                });
+
+                const selectedPreset = ref('sinusoidal');
+                const uploadedPresentationId = ref(localStorage.getItem('fm_presentation_id') || '');
+                const status = reactive({
+                    loading: false,
+                    message: '',
+                    type: '', // success, error, info
+                    url: ''
+                });
+
+                // Chat UI states
+                const chatExpanded = ref(true);
+                const chatInput = ref('');
+                const chatLoading = ref(false);
+                const chatMessages = ref([
+                    {
+                        role: 'assistant',
+                        text: "Welkom! Ik ben je diagram-assistent. Je kunt me vragen stellen om de grafiek te manipuleren. Bijvoorbeeld: 'verander de sinus naar 0.12 * sin(2*pi*x)', 'kleur de tangentlijnen blauw' of 'teken een lorenz attractor van t=0 tot 30'. Ik pas de instellingen direct live voor je aan!"
+                    }
+                ]);
+
+                // Core Reactive Diagram Configuration Schema
+                const config = reactive({
+                    canvasWidth: 720,
+                    canvasHeight: 405,
+                    fontFamily: 'Ubuntu',
+                    viewport: {
+                        xMin: 0,
+                        xMax: 6,
+                        yMin: -0.2,
+                        yMax: 0.2,
+                        marginLeft: 80,
+                        marginRight: 30,
+                        marginTop: 40,
+                        marginBottom: 50
+                    },
+                    grid: {
+                        show: true,
+                        xStep: 0.5,
+                        yStep: 0.05,
+                        dutchComma: true,
+                        showFrame: true,
+                        frameColor: '#000000',
+                        frameWidth: 3.0,
+                        isMultiGrid: false,
+                        rows: 2,
+                        cols: 3,
+                        gapX: 55,
+                        gapY: 55,
+                        boundaryStyle: 'box',
+                        xBreak: false,
+                        yBreak: false
+                    },
+                    functions: [],
+                    hatches: [],
+                    phaseMarkers: [],
+                    points: [],
+                    lines: [],
+                    textLabels: [],
+                    
+                    // Special Differential equations tracker (Euler simulation)
+                    diffeq: {
+                        active: false,
+                        eqX: '10 * (y - x)',
+                        eqY: 'x * (28 - z) - y',
+                        eqZ: 'x * y - (8/3) * z',
+                        initX: 0.1,
+                        initY: 0,
+                        initZ: 0,
+                        dt: 0.015,
+                        steps: 1000,
+                        stroke: '#0b5394',
+                        strokeWidth: 1.8
+                    }
+                });
+
+                // Status Computeds
+                const statusClass = ref('');
+                const statusIcon = ref('');
+
+                watch(status, (newVal) => {
+                    if (newVal.type === 'success') {
+                        statusClass.value = 'bg-green-100 text-green-800 border border-green-200 shadow-sm';
+                        statusIcon.value = 'fa-solid fa-circle-check text-green-600';
+                    } else if (newVal.type === 'error') {
+                        statusClass.value = 'bg-red-100 text-red-800 border border-red-200 shadow-sm';
+                        statusIcon.value = 'fa-solid fa-circle-exclamation text-red-600';
+                    } else if (newVal.type === 'info') {
+                        statusClass.value = 'bg-blue-100 text-blue-800 border border-blue-200 animate-pulse';
+                        statusIcon.value = 'fa-solid fa-spinner fa-spin text-blue-600';
+                    } else {
+                        statusClass.value = '';
+                        statusIcon.value = '';
+                    }
+                });
+
+                const toggleSection = (sec) => {
+                    activeSections[sec] = !activeSections[sec];
+                };
+
+                // Adders / Removers for Form items
+                const addFunction = () => {
+                    config.functions.push({
+                        expr: '0.1 * sin(2 * pi * x)',
+                        stroke: '#0b5394',
+                        strokeWidth: 2,
+                        xStart: config.viewport.xMin,
+                        xEnd: config.viewport.xMax,
+                        dasharray: 'none',
+                        active: true,
+                        isParametric: false,
+                        xExpr: 'cos(t)',
+                        yExpr: 'sin(t)',
+                        tStart: 0,
+                        tEnd: 6.28,
+                        cell: { row: 0, col: 0 },
+                        label: 'Standard Curve'
+                    });
+                };
+                const addParametricFunction = () => {
+                    config.functions.push({
+                        expr: '0.1 * sin(2 * pi * x)',
+                        stroke: '#0b5394',
+                        strokeWidth: 2.5,
+                        xStart: config.viewport.xMin,
+                        xEnd: config.viewport.xMax,
+                        dasharray: 'none',
+                        active: true,
+                        isParametric: true,
+                        xExpr: 'cos(t)',
+                        yExpr: 'sin(t)',
+                        tStart: 0,
+                        tEnd: 6.28,
+                        cell: { row: 0, col: 0 },
+                        label: 'Parametric Curve'
+                    });
+                };
+                const removeFunction = (idx) => { config.functions.splice(idx, 1); };
+
+                const addHatch = () => {
+                    config.hatches.push({
+                        topFunc: '0.1 * sin(2 * pi * x)',
+                        bottomFunc: '0',
+                        xStart: config.viewport.xMin,
+                        xEnd: config.viewport.xMax,
+                        stroke: '#cfe2f3',
+                        stepPt: 4,
+                        active: true
+                    });
+                };
+                const removeHatch = (idx) => { config.hatches.splice(idx, 1); };
+
+                const addPhaseMarker = () => {
+                    config.phaseMarkers.push({
+                        xStart: 1,
+                        xEnd: 5,
+                        yVal: (config.viewport.yMax - (config.viewport.yMax - config.viewport.yMin)*0.1),
+                        label: 'A',
+                        stroke: '#0b5394',
+                        active: true
+                    });
+                };
+                const removePhaseMarker = (idx) => { config.phaseMarkers.splice(idx, 1); };
+
+                const addPoint = () => {
+                    config.points.push({
+                        x: (config.viewport.xMax + config.viewport.xMin)/2,
+                        y: (config.viewport.yMax + config.viewport.yMin)/2,
+                        label: 'P',
+                        dotSize: 5,
+                        color: '#666666',
+                        active: true
+                    });
+                };
+                const removePoint = (idx) => { config.points.splice(idx, 1); };
+
+                const addLine = () => {
+                    config.lines.push({
+                        x1: config.viewport.xMin,
+                        y1: config.viewport.yMin,
+                        x2: config.viewport.xMax,
+                        y2: config.viewport.yMax,
+                        stroke: '#000000',
+                        strokeWidth: 2,
+                        type: 'line',
+                        dasharray: 'none',
+                        active: true
+                    });
+                };
+                const removeLine = (idx) => { config.lines.splice(idx, 1); };
+
+                const addTextLabel = () => {
+                    config.textLabels.push({
+                        text: 'Formula',
+                        x: (config.viewport.xMax + config.viewport.xMin)/2,
+                        y: (config.viewport.yMax + config.viewport.yMin)/2,
+                        coordinateMode: 'math',
+                        fontSize: 16,
+                        color: '#000000',
+                        align: 'center',
+                        isLatex: true,
+                        bold: false,
+                        maskBg: false
+                    });
+                };
+                const removeTextLabel = (idx) => { config.textLabels.splice(idx, 1); };
+
+                // PRESETS BUILDER
+                const loadPreset = () => {
+                    config.grid.isMultiGrid = false;
+                    config.diffeq.active = false;
+                    config.functions = [];
+                    config.hatches = [];
+                    config.phaseMarkers = [];
+                    config.points = [];
+                    config.lines = [];
+                    config.textLabels = [];
+
+                    if (selectedPreset.value === 'sinusoidal') {
+                        // Sinusoidal template
+                        config.viewport.xMin = 0; config.viewport.xMax = 6;
+                        config.viewport.yMin = -0.2; config.viewport.yMax = 0.2;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 30;
+                        config.viewport.marginTop = 40; config.viewport.marginBottom = 50;
+                        config.grid.xStep = 0.5; config.grid.yStep = 0.05;
+                        config.grid.dutchComma = true;
+                        
+                        config.functions.push({
+                            expr: '0.16 * sin(pi * x)',
+                            stroke: '#000000',
+                            strokeWidth: 3,
+                            xStart: 0,
+                            xEnd: 6,
+                            dasharray: 'none',
+                            active: true,
+                            isParametric: false,
+                            xExpr: '', yExpr: '', tStart: 0, tEnd: 0
+                        });
+
+                        // Tangent lines
+                        config.lines.push({
+                            x1: 2.6, y1: 0.2, x2: 3.4, y2: -0.2,
+                            stroke: '#980000', strokeWidth: 2.5,
+                            type: 'line', dasharray: 'none', active: true
+                        });
+                        config.lines.push({
+                            x1: 3.6, y1: -0.2, x2: 4.4, y2: 0.2,
+                            stroke: '#38761d', strokeWidth: 2.5,
+                            type: 'line', dasharray: 'none', active: true
+                        });
+
+                        // Tangent ends circles
+                        config.points.push(
+                            { x: 2.6, y: 0.2, label: '', dotSize: 4, color: '#980000', active: true },
+                            { x: 3.4, y: -0.2, label: '', dotSize: 4, color: '#980000', active: true },
+                            { x: 3.6, y: -0.2, label: '', dotSize: 4, color: '#38761d', active: true },
+                            { x: 4.4, y: 0.2, label: '', dotSize: 4, color: '#38761d', active: true }
+                        );
+
+                        // Vertex circles
+                        config.points.push(
+                            { x: 2.5, y: 0.16, label: 'P', dotSize: 5, color: '#666666', active: true },
+                            { x: 3.5, y: -0.16, label: 'R', dotSize: 5, color: '#666666', active: true },
+                            { x: 3.0, y: 0.0, label: 'Q', dotSize: 5, color: '#bf9000', active: true },
+                            { x: 4.0, y: 0.0, label: 'S', dotSize: 5, color: '#38761d', active: true }
+                        );
+
+                        // Side ticks & Labels
+                        config.textLabels.push(
+                            { text: 'u', x: 20, y: 25, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (m)', x: 26, y: 25, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false },
+                            { text: 't', x: 652, y: 385, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (s)', x: 658, y: 385, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false }
+                        );
+
+                        // LaTeX coordinates tags
+                        config.textLabels.push(
+                            { text: '(2{,}6; 0{,}2)', x: 2.6, y: 0.22, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'center', isLatex: true, bold: true, maskBg: true },
+                            { text: '(3{,}4; -0{,}2)', x: 3.3, y: -0.20, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'right', isLatex: true, bold: true, maskBg: true },
+                            { text: '(4{,}4; 0{,}2)', x: 4.4, y: 0.22, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'center', isLatex: true, bold: true, maskBg: true },
+                            { text: '(3{,}6; -0{,}2)', x: 3.7, y: -0.20, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'left', isLatex: true, bold: true, maskBg: true }
+                        );
+
+                    } else if (selectedPreset.value === 'area') {
+                        // Area under piecewise trajectory
+                        config.viewport.xMin = 0; config.viewport.xMax = 12;
+                        config.viewport.yMin = 0; config.viewport.yMax = 10;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 50; config.viewport.marginBottom = 50;
+                        config.grid.xStep = 2.0; config.grid.yStep = 2.0;
+                        config.grid.dutchComma = false;
+
+                        // Piecewise function curve expression
+                        const piecewise_expr = 'x < 4 ? 2*x : (x < 8 ? 8 : 8 - 2*(x-8))';
+                        config.functions.push({
+                            expr: piecewise_expr,
+                            stroke: '#000000',
+                            strokeWidth: 3.5,
+                            xStart: 0,
+                            xEnd: 12,
+                            dasharray: 'none',
+                            active: true,
+                            isParametric: false,
+                            xExpr: '', yExpr: '', tStart: 0, tEnd: 0
+                        });
+
+                        // Hatch
+                        config.hatches.push({
+                            topFunc: piecewise_expr,
+                            bottomFunc: '0',
+                            xStart: 0,
+                            xEnd: 12,
+                            stroke: '#cfe2f3',
+                            stepPt: 4.0,
+                            active: true
+                        });
+
+                        // Custom labels
+                        config.textLabels.push(
+                            { text: 'v', x: 20, y: 35, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (m/s)', x: 26, y: 35, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false },
+                            { text: 't', x: 642, y: 385, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (s)', x: 648, y: 385, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false }
+                        );
+
+                        config.textLabels.push(
+                            { text: 'v(t)', x: 6, y: 8.5, coordinateMode: 'math', fontSize: 16, color: '#000000', align: 'center', isLatex: true, bold: true, maskBg: false }
+                        );
+
+                    } else if (selectedPreset.value === 'phases') {
+                        // Phase range markers diagram
+                        config.viewport.xMin = 0; config.viewport.xMax = 18;
+                        config.viewport.yMin = 0; config.viewport.yMax = 14;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 60; config.viewport.marginBottom = 50;
+                        config.grid.xStep = 2; config.grid.yStep = 2;
+                        config.grid.dutchComma = false;
+
+                        // Phase Double horizontal arrows
+                        config.phaseMarkers.push(
+                            { xStart: 0, xEnd: 5, yVal: 13, label: 'A', stroke: '#0b5394', active: true },
+                            { xStart: 5, xEnd: 12, yVal: 13, label: 'B', stroke: '#38761d', active: true },
+                            { xStart: 12, xEnd: 18, yVal: 13, label: 'C', stroke: '#980000', active: true }
+                        );
+
+                        // Piecewise lines
+                        config.lines.push(
+                            { x1: 0, y1: 0, x2: 5, y2: 10, stroke: '#000000', strokeWidth: 3.5, type: 'line', dasharray: 'none', active: true },
+                            { x1: 5, y1: 10, x2: 12, y2: 10, stroke: '#000000', strokeWidth: 3.5, type: 'line', dasharray: 'none', active: true },
+                            { x1: 12, y1: 10, x2: 18, y2: 4, stroke: '#000000', strokeWidth: 3.5, type: 'line', dasharray: 'none', active: true }
+                        );
+
+                        // Vertices Circles
+                        config.points.push(
+                            { x: 5, y: 10, label: '', dotSize: 4, color: '#bf9000', active: true },
+                            { x: 12, y: 10, label: '', dotSize: 4, color: '#bf9000', active: true },
+                            { x: 18, y: 4, label: '', dotSize: 4, color: '#bf9000', active: true }
+                        );
+
+                        // Axis and Labels
+                        config.textLabels.push(
+                            { text: 'x', x: 20, y: 35, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (m)', x: 26, y: 35, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false },
+                            { text: 't', x: 642, y: 385, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
+                            { text: ' (s)', x: 648, y: 385, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false }
+                        );
+
+                    } else if (selectedPreset.value === 'diffeq') {
+                        // Lorenz Attractor Differential equation projection template
+                        config.viewport.xMin = -25; config.viewport.xMax = 25;
+                        config.viewport.yMin = -5; config.viewport.yMax = 55;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 65; config.viewport.marginBottom = 55;
+                        config.grid.xStep = 10; config.grid.yStep = 10;
+                        config.grid.dutchComma = false;
+
+                        config.diffeq.active = true;
+                        
+                        // Traditional Lorenz formula titles
+                        config.textLabels.push(
+                            { text: '\\frac{dx}{dt} = \\sigma(y - x)', x: 0, y: 50, coordinateMode: 'math', fontSize: 16, color: '#0b5394', align: 'center', isLatex: true, bold: false, maskBg: true },
+                            { text: '\\frac{dy}{dt} = x(\\rho - z) - y', x: 16, y: 45, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'left', isLatex: true, bold: false, maskBg: true },
+                            { text: '\\frac{dz}{dt} = xy - \\beta z', x: -16, y: 45, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'right', isLatex: true, bold: false, maskBg: true }
+                        );
+
+                        config.textLabels.push(
+                            { text: 'Lorenz Attractor (X-Z plane projection)', x: 360, y: 30, coordinateMode: 'screen', fontSize: 18, color: '#0b5394', align: 'center', isLatex: false, bold: true, maskBg: false }
+                        );
+
+                    } else if (selectedPreset.value === 'parametric') {
+                        // Parametric Curve (Lissajous) template
+                        config.viewport.xMin = -1.5; config.viewport.xMax = 1.5;
+                        config.viewport.yMin = -1.5; config.viewport.yMax = 1.5;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 50; config.viewport.marginBottom = 50;
+                        config.grid.xStep = 0.5; config.grid.yStep = 0.5;
+                        config.grid.dutchComma = false;
+
+                        config.functions.push({
+                            expr: '0.1 * sin(2 * pi * x)',
+                            stroke: '#0b5394',
+                            strokeWidth: 3,
+                            xStart: -1.5,
+                            xEnd: 1.5,
+                            dasharray: 'none',
+                            active: true,
+                            isParametric: true,
+                            xExpr: 'sin(3 * t)',
+                            yExpr: 'sin(4 * t)',
+                            tStart: 0,
+                            tEnd: 6.28
+                        });
+
+                        // Standard text labels
+                        config.textLabels.push(
+                            { text: 'Lissajous Curve', x: 360, y: 30, coordinateMode: 'screen', fontSize: 18, color: '#0b5394', align: 'center', isLatex: false, bold: true, maskBg: false },
+                            { text: 'x(t) = \\sin(3t)', x: -1.2, y: 1.2, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'left', isLatex: true, bold: false, maskBg: true },
+                            { text: 'y(t) = \\sin(4t)', x: -1.2, y: 1.0, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'left', isLatex: true, bold: false, maskBg: true }
+                        );
+
+                    } else if (selectedPreset.value === 'multigrid') {
+                        // Multi Grid cell representation
+                        config.viewport.xMin = 0; config.viewport.xMax = 5;
+                        config.viewport.yMin = 0; config.viewport.yMax = 5;
+                        config.viewport.marginLeft = 60; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 70; config.viewport.marginBottom = 40;
+                        config.grid.xStep = 1; config.grid.yStep = 1;
+                        config.grid.dutchComma = false;
+                        config.grid.isMultiGrid = true;
+                        config.grid.rows = 2;
+                        config.grid.cols = 3;
+                        config.grid.gapX = 55;
+                        config.grid.gapY = 55;
+
+                        // Grand Header
+                        config.textLabels.push(
+                            { text: 'Overzicht van Bewegingstypen (Grid)', x: 30, y: 35, coordinateMode: 'screen', fontSize: 20, color: '#0b5394', align: 'left', isLatex: false, bold: true, maskBg: false }
+                        );
+                        
+                        config.functions.push(
+                            { expr: 'x', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant v: x(t)', cell: {row: 0, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '1', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant v: v(t)', cell: {row: 1, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0.18 * x^2', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant a: x(t)', cell: {row: 0, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0.36 * x', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant a: v(t)', cell: {row: 1, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '3', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Stilstand: x(t)', cell: {row: 0, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Stilstand: v(t)', cell: {row: 1, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 }
+                        );
+                    } else if (selectedPreset.value === 'minimal') {
+                        // Reset to standard minimal diagram view
+                        config.viewport.xMin = 0; config.viewport.xMax = 10;
+                        config.viewport.yMin = 0; config.viewport.yMax = 10;
+                        config.viewport.marginLeft = 80; config.viewport.marginRight = 40;
+                        config.viewport.marginTop = 40; config.viewport.marginBottom = 50;
+                        config.grid.show = true;
+                        config.grid.xStep = 1.0; config.grid.yStep = 1.0;
+                        config.grid.dutchComma = false;
+                        config.grid.showFrame = true;
+                    }
+                    
+                    drawLivePreview();
+                };
+
+                // MATH EVALUATION WRAPPERS
+                const evaluateFunction = (expression, x, t) => {
+                    try {
+                        if (expression.includes('?') || expression.includes('if')) {
+                            let parsed = expression
+                                .replace(/\be\b/g, "Math.E")
+                                .replace(/pi/g, "Math.PI")
+                                .replace(/sin/g, "Math.sin")
+                                .replace(/cos/g, "Math.cos")
+                                .replace(/tan/g, "Math.tan")
+                                .replace(/sqrt/g, "Math.sqrt")
+                                .replace(/pow/g, "Math.pow")
+                                .replace(/\^/g, "**");
+                            const fn = new Function("x", "t", `return ${parsed};`);
+                            return fn(x, t !== undefined ? t : x);
+                        }
+                        
+                        return math.evaluate(expression, { x: x, t: t !== undefined ? t : x, e: Math.E, pi: Math.PI });
+                    } catch (e) {
+                        return 0;
+                    }
+                };
+
+                // CLIENT PREVIEW CANVAS DRAWING ENGINE
+                const drawLivePreview = () => {
+                    const canvas = document.getElementById('live-canvas');
+                    if (!canvas) return;
+                    const ctx = canvas.getContext('2d');
+                    
+                    const width = config.canvasWidth;
+                    const height = config.canvasHeight;
+                    
+                    // Clear canvas and overlays
+                    ctx.clearRect(0, 0, width, height);
+                    const katexLayer = document.getElementById('katex-layer');
+                    if (katexLayer) katexLayer.innerHTML = '';
+                    
+                    // Build standard presentation background
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, width, height);
+
+                    // Track flat slide elements for 1:1 Slides Export
+                    const slideElements = [];
+
+                    // RENDER SCENARIO 1: Multi-Grid Preset
+                    if (config.grid.isMultiGrid) {
+                        const numRows = config.grid.rows || 2;
+                        const numCols = config.grid.cols || 3;
+                        const gapX = config.grid.gapX || 55;
+                        const gapY = config.grid.gapY || 55;
+                        
+                        config.functions.forEach((fn) => {
+                            if (!fn.active || !fn.cell) return;
+                            const cellRow = fn.cell.row;
+                            const cellCol = fn.cell.col;
+                            
+                            // Map grid coordinate limits
+                            const cellWidth = (width - config.viewport.marginLeft - config.viewport.marginRight - (numCols - 1) * gapX) / numCols;
+                            const cellHeight = (height - config.viewport.marginTop - config.viewport.marginBottom - (numRows - 1) * gapY) / numRows;
+                            
+                            const cellLeft = config.viewport.marginLeft + cellCol * (cellWidth + gapX);
+                            const cellTop = config.viewport.marginTop + cellRow * (cellHeight + gapY);
+                            
+                            const cellRight = width - (cellLeft + cellWidth);
+                            const cellBottom = height - (cellTop + cellHeight);
+                            
+                            // Create temporary cell viewport mapping
+                            const cellViewport = {
+                                xMin: config.viewport.xMin,
+                                xMax: config.viewport.xMax,
+                                yMin: config.viewport.yMin,
+                                yMax: config.viewport.yMax,
+                                marginLeft: cellLeft,
+                                marginRight: cellRight,
+                                marginTop: cellTop,
+                                marginBottom: cellBottom,
+                                plotWidth: cellWidth,
+                                plotHeight: cellHeight
+                            };
+                            
+                            // 1. Draw cell enclosing boundary
+                            ctx.strokeStyle = '#444444';
+                            ctx.lineWidth = 1.5;
+                            ctx.strokeRect(cellLeft, cellTop, cellWidth, cellHeight);
+                            
+                            slideElements.push({
+                                type: 'rect', x: cellLeft, y: cellTop, width: cellWidth, height: cellHeight,
+                                fill: 'none', stroke: '#444444', stroke_width: 1.5
+                            });
+                            
+                            // 2. Draw cell dashed grid lines & ticks
+                            ctx.lineWidth = 0.5;
+                            ctx.strokeStyle = '#eeeeee';
+                            ctx.fillStyle = '#666666';
+                            ctx.font = '10px Ubuntu, sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            
+                            // Verticals
+                            for (let x_val = cellViewport.xMin + 1; x_val < cellViewport.xMax; x_val += config.grid.xStep) {
+                                const px = mapX(x_val, cellViewport);
+                                ctx.beginPath();
+                                ctx.setLineDash([3, 3]);
+                                ctx.moveTo(px, cellTop);
+                                ctx.lineTo(px, cellTop + cellHeight);
+                                ctx.stroke();
+                                
+                                slideElements.push({
+                                    type: 'line', x1: px, y1: cellTop, x2: px, y2: cellTop + cellHeight,
+                                    stroke: '#eeeeee', stroke_width: 1.0, dasharray: '3,3'
+                                });
+                                
+                                // tick x
+                                let x_rounded = parseFloat(x_val.toFixed(4));
+                                ctx.fillText(x_rounded, px, cellTop + cellHeight + 12);
+                                slideElements.push({
+                                    type: 'text', x: px, y: cellTop + cellHeight + 12, text: x_rounded.toString(),
+                                    font_size: 10, color: '#666666', align: 'center'
+                                });
+                            }
+                            // Horizontals
+                            for (let y_val = cellViewport.yMin + 1; y_val < cellViewport.yMax; y_val += config.grid.yStep) {
+                                const py = mapY(y_val, cellViewport);
+                                ctx.beginPath();
+                                ctx.setLineDash([3, 3]);
+                                ctx.moveTo(cellLeft, py);
+                                ctx.lineTo(cellLeft + cellWidth, py);
+                                ctx.stroke();
+                                
+                                slideElements.push({
+                                    type: 'line', x1: cellLeft, y1: py, x2: cellLeft + cellWidth, y2: py,
+                                    stroke: '#eeeeee', stroke_width: 1.0, dasharray: '3,3'
+                                });
+                                
+                                // tick y
+                                let y_rounded = parseFloat(y_val.toFixed(4));
+                                ctx.fillText(y_rounded, cellLeft - 10, py);
+                                slideElements.push({
+                                    type: 'text', x: cellLeft - 10, y: py, text: y_rounded.toString(),
+                                    font_size: 10, color: '#666666', align: 'right'
+                                });
+                            }
+                            
+                            // Axis arrows (standard bottom-left labels)
+                            // t label x-axis
+                            ctx.fillStyle = '#000000';
+                            ctx.font = 'italic bold 11px Ubuntu, sans-serif';
+                            ctx.textAlign = 'left';
+                            ctx.fillText('t', cellLeft + cellWidth + 8, cellTop + cellHeight);
+                            slideElements.push({
+                                type: 'text', x: cellLeft + cellWidth + 8, y: cellTop + cellHeight, text: 't',
+                                font_size: 11, color: '#000000', bold: true, italic: true, align: 'left'
+                            });
+                            
+                            // y label y-axis
+                            const yLabel = cellRow === 0 ? 'x' : 'v';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(yLabel, cellLeft, cellTop - 12);
+                            slideElements.push({
+                                type: 'text', x: cellLeft, y: cellTop - 12, text: yLabel,
+                                font_size: 11, color: '#000000', bold: true, italic: true, align: 'center'
+                            });
+                            
+                            // Cell title
+                            ctx.fillStyle = '#0b5394';
+                            ctx.font = 'bold 11px Ubuntu, sans-serif';
+                            ctx.fillText(fn.label, cellLeft + cellWidth/2, cellTop - 15);
+                            slideElements.push({
+                                type: 'text', x: cellLeft + cellWidth/2, y: cellTop - 15, text: fn.label,
+                                font_size: 11, color: '#0b5394', bold: true, align: 'center'
+                            });
+                            
+                            // Draw Function
+                            ctx.strokeStyle = fn.stroke;
+                            ctx.lineWidth = fn.strokeWidth;
+                            ctx.setLineDash([]);
+                            ctx.beginPath();
+                            
+                            let isFirst = true;
+                            const steps = 150;
+                            const range = fn.xEnd - fn.xStart;
+                            
+                            for (let i = 0; i <= steps; i++) {
+                                const mx = fn.xStart + (i / steps) * range;
+                                const my = evaluateFunction(fn.expr, mx);
+                                if (mx >= cellViewport.xMin && mx <= cellViewport.xMax && my >= cellViewport.yMin && my <= cellViewport.yMax) {
+                                    const px = mapX(mx, cellViewport);
+                                    const py = mapY(my, cellViewport);
+                                    if (isFirst) {
+                                        ctx.moveTo(px, py);
+                                        isFirst = false;
+                                    } else {
+                                        ctx.lineTo(px, py);
+                                    }
+                                }
+                            }
+                            ctx.stroke();
+                            
+                            // Serialize function line to slides vector primitives
+                            isFirst = true;
+                            let prevPx = 0, prevPy = 0;
+                            for (let i = 0; i <= steps; i++) {
+                                const mx = fn.xStart + (i / steps) * range;
+                                const my = evaluateFunction(fn.expr, mx);
+                                if (mx >= cellViewport.xMin && mx <= cellViewport.xMax && my >= cellViewport.yMin && my <= cellViewport.yMax) {
+                                    const px = mapX(mx, cellViewport);
+                                    const py = mapY(my, cellViewport);
+                                    if (!isFirst) {
+                                        slideElements.push({
+                                            type: 'line', x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                            stroke: fn.stroke, stroke_width: fn.strokeWidth
+                                        });
+                                    }
+                                    prevPx = px;
+                                    prevPy = py;
+                                    isFirst = false;
+                                }
+                            }
+                        });
+                        
+                        // Draw any custom text labels for Multigrid
+                        config.textLabels.forEach((lbl) => {
+                            drawTextLabel(ctx, lbl, slideElements, katexLayer);
+                        });
+                        
+                        return; // Done multi grid
+                    }
+
+                    // RENDER SCENARIO 2: Single-Viewport standard diagrams (Sinus, Area, Phases, DiffEq)
+                    const viewport = {
+                        xMin: config.viewport.xMin,
+                        xMax: config.viewport.xMax,
+                        yMin: config.viewport.yMin,
+                        yMax: config.viewport.yMax,
+                        marginLeft: config.viewport.marginLeft,
+                        marginRight: config.viewport.marginRight,
+                        marginTop: config.viewport.marginTop,
+                        marginBottom: config.viewport.marginBottom,
+                        plotWidth: width - config.viewport.marginLeft - config.viewport.marginRight,
+                        plotHeight: height - config.viewport.marginTop - config.viewport.marginBottom
+                    };
+
+                    const pxMin = viewport.marginLeft;
+                    const pxMax = width - viewport.marginRight;
+                    const pyMin = height - viewport.marginBottom; // bottom edge
+                    const pyMax = viewport.marginTop;             // top edge
+
+                    const axesElements = [];
+                    const doXBreak = config.grid.xBreak || (config.grid.xBreak !== false && (viewport.xMin > 0.1 || viewport.xMax < -0.1));
+                    const doYBreak = config.grid.yBreak || (config.grid.yBreak !== false && (viewport.yMin > 0.1 || viewport.yMax < -0.1));
+
+                    // 1. Draw Grid Lines if requested
+                    if (config.grid.show) {
+                        ctx.strokeStyle = '#dddddd';
+                        ctx.lineWidth = 1.0;
+                        
+                        // Verticals
+                        if (config.grid.xStep > 0) {
+                            let startVal = Math.ceil(viewport.xMin / config.grid.xStep) * config.grid.xStep;
+                            for (let xv = startVal; xv < viewport.xMax; xv += config.grid.xStep) {
+                                if (Math.abs(xv - viewport.xMin) < 1e-5 || Math.abs(xv - viewport.xMax) < 1e-5) continue;
+                                const px = mapX(xv, viewport);
+                                ctx.beginPath();
+                                ctx.setLineDash([4, 4]);
+                                ctx.moveTo(px, pyMax);
+                                ctx.lineTo(px, pyMin);
+                                ctx.stroke();
+                                
+                                axesElements.push({
+                                    type: "line", x1: px, y1: pyMax, x2: px, y2: pyMin,
+                                    stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
+                                });
+                            }
+                        }
+
+                        // Horizontals
+                        if (config.grid.yStep > 0) {
+                            let startVal = Math.ceil(viewport.yMin / config.grid.yStep) * config.grid.yStep;
+                            for (let yv = startVal; yv < viewport.yMax; yv += config.grid.yStep) {
+                                if (Math.abs(yv - viewport.yMin) < 1e-5 || Math.abs(yv - viewport.yMax) < 1e-5) continue;
+                                const py = mapY(yv, viewport);
+                                ctx.beginPath();
+                                ctx.setLineDash([4, 4]);
+                                ctx.moveTo(pxMin, py);
+                                ctx.lineTo(pxMax, py);
+                                ctx.stroke();
+                                
+                                axesElements.push({
+                                    type: "line", x1: pxMin, y1: py, x2: pxMax, y2: py,
+                                    stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
+                                });
+                            }
+                        }
+                    }
+
+                    // Ticks/Labels axes positions
+                    const boundaryStyle = config.grid.boundaryStyle || (config.grid.showFrame ? 'box' : 'arrows');
+                    const yAxisPos = (viewport.yMin <= 0.0 && viewport.yMax >= 0.0 && boundaryStyle === 'arrows') ? 0.0 : viewport.yMin;
+                    const xAxisPos = (viewport.xMin <= 0.0 && viewport.xMax >= 0.0 && boundaryStyle === 'arrows') ? 0.0 : viewport.xMin;
+                    const pyAxisLabel = mapY(yAxisPos, viewport);
+                    const pxAxisLabel = mapX(xAxisPos, viewport);
+
+                    // 2. Draw Boundary Frame / Axes
+                    if (boundaryStyle === 'box') {
+                        ctx.strokeStyle = config.grid.frameColor || '#000000';
+                        ctx.lineWidth = config.grid.frameWidth || 2.0;
+                        ctx.setLineDash([]);
+
+                        // Bottom line with optional xBreak
+                        if (doXBreak) {
+                            const pxBreak = pxMin + 30.0;
+                            // Left part
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyMin);
+                            ctx.lineTo(pxBreak - 10, pyMin);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyMin, x2: pxBreak - 10, y2: pyMin, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+
+                            // Zig-zag
+                            ctx.beginPath();
+                            ctx.moveTo(pxBreak - 10, pyMin);
+                            ctx.lineTo(pxBreak - 5, pyMin - 6);
+                            ctx.lineTo(pxBreak, pyMin + 6);
+                            ctx.lineTo(pxBreak + 5, pyMin - 6);
+                            ctx.lineTo(pxBreak + 10, pyMin);
+                            ctx.stroke();
+
+                            axesElements.push({ type: "line", x1: pxBreak - 10, y1: pyMin, x2: pxBreak - 5, y2: pyMin - 6, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxBreak - 5, y1: pyMin - 6, x2: pxBreak, y2: pyMin + 6, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxBreak, y1: pyMin + 6, x2: pxBreak + 5, y2: pyMin - 6, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxBreak + 5, y1: pyMin - 6, x2: pxBreak + 10, y2: pyMin, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+
+                            // Right part
+                            ctx.beginPath();
+                            ctx.moveTo(pxBreak + 10, pyMin);
+                            ctx.lineTo(pxMax, pyMin);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxBreak + 10, y1: pyMin, x2: pxMax, y2: pyMin, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                        } else {
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyMin);
+                            ctx.lineTo(pxMax, pyMin);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyMin, x2: pxMax, y2: pyMin, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                        }
+
+                        // Left line with optional yBreak
+                        if (doYBreak) {
+                            const pyBreak = pyMin - 30.0;
+                            // Bottom part
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyMin);
+                            ctx.lineTo(pxMin, pyBreak + 10);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyMin, x2: pxMin, y2: pyBreak + 10, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+
+                            // Zig-zag
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyBreak + 10);
+                            ctx.lineTo(pxMin - 6, pyBreak + 5);
+                            ctx.lineTo(pxMin + 6, pyBreak);
+                            ctx.lineTo(pxMin - 6, pyBreak - 5);
+                            ctx.lineTo(pxMin, pyBreak - 10);
+                            ctx.stroke();
+
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyBreak + 10, x2: pxMin - 6, y2: pyBreak + 5, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxMin - 6, y1: pyBreak + 5, x2: pxMin + 6, y2: pyBreak, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxMin + 6, y1: pyBreak, x2: pxMin - 6, y2: pyBreak - 5, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                            axesElements.push({ type: "line", x1: pxMin - 6, y1: pyBreak - 5, x2: pxMin, y2: pyBreak - 10, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+
+                            // Top part
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyBreak - 10);
+                            ctx.lineTo(pxMin, pyMax);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyBreak - 10, x2: pxMin, y2: pyMax, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                        } else {
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyMin);
+                            ctx.lineTo(pxMin, pyMax);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyMin, x2: pxMin, y2: pyMax, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                        }
+
+                        // Top and Right edges of box
+                        ctx.beginPath();
+                        ctx.moveTo(pxMin, pyMax);
+                        ctx.lineTo(pxMax, pyMax);
+                        ctx.lineTo(pxMax, pyMin);
+                        ctx.stroke();
+
+                        axesElements.push({ type: "line", x1: pxMin, y1: pyMax, x2: pxMax, y2: pyMax, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+                        axesElements.push({ type: "line", x1: pxMax, y1: pyMin, x2: pxMax, y2: pyMax, stroke: config.grid.frameColor || '#000000', stroke_width: config.grid.frameWidth || 2.0 });
+
+                    } else if (boundaryStyle === 'arrows') {
+                        const pyAxis = mapY(yAxisPos, viewport);
+                        const pxAxis = mapX(xAxisPos, viewport);
+
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2.5;
+                        ctx.setLineDash([]);
+
+                        // X-axis arrow
+                        if (doXBreak) {
+                            const pxBreak = pxMin + 30.0;
+                            // Left part
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyAxis);
+                            ctx.lineTo(pxBreak - 10, pyAxis);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxMin, y1: pyAxis, x2: pxBreak - 10, y2: pyAxis, stroke: '#000000', stroke_width: 2.5 });
+
+                            // Zig-zag
+                            ctx.beginPath();
+                            ctx.moveTo(pxBreak - 10, pyAxis);
+                            ctx.lineTo(pxBreak - 5, pyAxis - 6);
+                            ctx.lineTo(pxBreak, pyAxis + 6);
+                            ctx.lineTo(pxBreak + 5, pyAxis - 6);
+                            ctx.lineTo(pxBreak + 10, pyAxis);
+                            ctx.stroke();
+
+                            axesElements.push({ type: "line", x1: pxBreak - 10, y1: pyAxis, x2: pxBreak - 5, y2: pyAxis - 6, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxBreak - 5, y1: pyAxis - 6, x2: pxBreak, y2: pyAxis + 6, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxBreak, y1: pyAxis + 6, x2: pxBreak + 5, y2: pyAxis - 6, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxBreak + 5, y1: pyAxis - 6, x2: pxBreak + 10, y2: pyAxis, stroke: '#000000', stroke_width: 2.5 });
+
+                            // Right part with arrow
+                            ctx.beginPath();
+                            ctx.moveTo(pxBreak + 10, pyAxis);
+                            ctx.lineTo(pxMax, pyAxis);
+                            ctx.stroke();
+                            drawArrowHead(ctx, pxBreak + 10, pyAxis, pxMax + 15, pyAxis, '#000000', 10);
+                            axesElements.push({ type: "arrow", x1: pxBreak + 10, y1: pyAxis, x2: pxMax + 15, y2: pyAxis, stroke: '#000000', stroke_width: 2.5 });
+                        } else {
+                            ctx.beginPath();
+                            ctx.moveTo(pxMin, pyAxis);
+                            ctx.lineTo(pxMax, pyAxis);
+                            ctx.stroke();
+                            drawArrowHead(ctx, pxMin, pyAxis, pxMax + 15, pyAxis, '#000000', 10);
+                            axesElements.push({ type: "arrow", x1: pxMin, y1: pyAxis, x2: pxMax + 15, y2: pyAxis, stroke: '#000000', stroke_width: 2.5 });
+                        }
+
+                        // Y-axis arrow
+                        if (doYBreak) {
+                            const pyBreak = pyMin - 30.0;
+                            // Bottom part
+                            ctx.beginPath();
+                            ctx.moveTo(pxAxis, pyMin);
+                            ctx.lineTo(pxAxis, pyBreak + 10);
+                            ctx.stroke();
+                            axesElements.push({ type: "line", x1: pxAxis, y1: pyMin, x2: pxAxis, y2: pyBreak + 10, stroke: '#000000', stroke_width: 2.5 });
+
+                            // Zig-zag
+                            ctx.beginPath();
+                            ctx.moveTo(pxAxis, pyBreak + 10);
+                            ctx.lineTo(pxAxis - 6, pyBreak + 5);
+                            ctx.lineTo(pxAxis + 6, pyBreak);
+                            ctx.lineTo(pxAxis - 6, pyBreak - 5);
+                            ctx.lineTo(pxAxis, pyBreak - 10);
+                            ctx.stroke();
+
+                            axesElements.push({ type: "line", x1: pxAxis, y1: pyBreak + 10, x2: pxAxis - 6, y2: pyBreak + 5, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxAxis - 6, y1: pyBreak + 5, x2: pxAxis + 6, y2: pyBreak, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxAxis + 6, y1: pyBreak, x2: pxAxis - 6, y2: pyBreak - 5, stroke: '#000000', stroke_width: 2.5 });
+                            axesElements.push({ type: "line", x1: pxAxis - 6, y1: pyBreak - 5, x2: pxAxis, y2: pyBreak - 10, stroke: '#000000', stroke_width: 2.5 });
+
+                            // Top part with arrow
+                            ctx.beginPath();
+                            ctx.moveTo(pxAxis, pyBreak - 10);
+                            ctx.lineTo(pxAxis, pyMax);
+                            ctx.stroke();
+                            drawArrowHead(ctx, pxAxis, pyBreak - 10, pxAxis, pyMax - 15, '#000000', 10);
+                            axesElements.push({ type: "arrow", x1: pxAxis, y1: pyBreak - 10, x2: pxAxis, y2: pyMax - 15, stroke: '#000000', stroke_width: 2.5 });
+                        } else {
+                            ctx.beginPath();
+                            ctx.moveTo(pxAxis, pyMin);
+                            ctx.lineTo(pxAxis, pyMax);
+                            ctx.stroke();
+                            drawArrowHead(ctx, pxAxis, pyMin, pxAxis, pyMax - 15, '#000000', 10);
+                            axesElements.push({ type: "arrow", x1: pxAxis, y1: pyMin, x2: pxAxis, y2: pyMax - 15, stroke: '#000000', stroke_width: 2.5 });
+                        }
+                    }
+
+                    // Push axesElements into slideElements as grouped
+                    if (axesElements.length > 0) {
+                        const childIds = [];
+                        axesElements.forEach((el, index) => {
+                            const cid = `axes_child_${index}`;
+                            el.id = cid;
+                            slideElements.push(el);
+                            childIds.push(cid);
+                        });
+                        slideElements.push({
+                            type: "group",
+                            id: "axes_group",
+                            childrenObjectIds: childIds
+                        });
+                    }
+
+                    // 3. Draw Hatch Areas
+                    config.hatches.forEach((ht) => {
+                        if (!ht.active) return;
+                        
+                        ctx.strokeStyle = ht.stroke;
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([]);
+                        
+                        const stepPt = parseFloat(ht.stepPt || 4.0);
+                        const mathStart = ht.xStart;
+                        const mathEnd = ht.xEnd;
+                        
+                        const screenStart = mapX(mathStart, viewport);
+                        const screenEnd = mapX(mathEnd, viewport);
+                        
+                        for (let sx = screenStart; sx <= screenEnd; sx += stepPt) {
+                            const mx = viewport.xMin + ((sx - viewport.marginLeft) / viewport.plotWidth) * (viewport.xMax - viewport.xMin);
+                            const valTop = evaluateFunction(ht.topFunc, mx);
+                            const valBottom = evaluateFunction(ht.bottomFunc, mx);
+                            
+                            const syTop = mapY(valTop, viewport);
+                            const syBottom = mapY(valBottom, viewport);
+                            
+                            if (syTop >= pyMax && syTop <= pyMin && syBottom >= pyMax && syBottom <= pyMin) {
+                                ctx.beginPath();
+                                ctx.moveTo(sx, syBottom);
+                                ctx.lineTo(sx, syTop);
+                                ctx.stroke();
+                                
+                                slideElements.push({
+                                    type: "line", x1: sx, y1: syBottom, x2: sx, y2: syTop,
+                                    stroke: ht.stroke, stroke_width: 1.5
+                                });
+                            }
+                        }
+                    });
+
+                    // 5. Draw Axes Ticks Numbers
+                    ctx.fillStyle = '#000000';
+                    ctx.font = '16px Ubuntu, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.setLineDash([]);
+                    
+                    // Generate X-ticks values exactly
+                    if (config.grid.xStep > 0) {
+                        let startVal = Math.ceil(viewport.xMin / config.grid.xStep) * config.grid.xStep;
+                        for (let t = startVal; t <= viewport.xMax; t += config.grid.xStep) {
+                            if (t === 0.0 && !doXBreak) continue;
+                            const px = mapX(t, viewport);
+                            let tRounded = parseFloat(t.toFixed(4));
+                            let lbl = tRounded.toString();
+                            if (config.grid.dutchComma) {
+                                lbl = lbl.replace('.', ',');
+                            }
+                            ctx.fillText(lbl, px, pyAxisLabel + 15);
+                            
+                            slideElements.push({
+                                type: "text", x: px, y: pyAxisLabel + 20, text: lbl,
+                                font_size: 16, color: '#000000', align: 'center'
+                            });
+                        }
+                    }
+
+                    // Generate Y-ticks values
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    if (config.grid.yStep > 0) {
+                        let startVal = Math.ceil(viewport.yMin / config.grid.yStep) * config.grid.yStep;
+                        for (let v = startVal; v <= viewport.yMax; v += config.grid.yStep) {
+                            if (v === 0.0 && !doYBreak) continue;
+                            const py = mapY(v, viewport);
+                            let vRounded = parseFloat(v.toFixed(4));
+                            let lbl = vRounded.toString();
+                            if (config.grid.dutchComma) {
+                                lbl = lbl.replace('.', ',');
+                            }
+                            ctx.fillText(lbl, pxAxisLabel - 15, py);
+                            
+                            slideElements.push({
+                                type: "text", x: pxAxisLabel - 15, y: py, text: lbl,
+                                font_size: 16, color: '#000000', align: 'right'
+                            });
+                        }
+                    }
+
+                    // 6. Draw Curves (Standard or Parametric!)
+                    config.functions.forEach((fn) => {
+                        if (!fn.active) return;
+                        ctx.strokeStyle = fn.stroke;
+                        ctx.lineWidth = fn.strokeWidth;
+                        
+                        if (fn.dasharray !== 'none') {
+                            const dash = fn.dasharray.split(',').map(Number);
+                            ctx.setLineDash(dash);
+                        } else {
+                            ctx.setLineDash([]);
+                        }
+                        
+                        ctx.beginPath();
+                        let isFirst = true;
+                        const steps = 300;
+                        
+                        if (!fn.isParametric) {
+                            // Standard Curve Mode: Y = f(x)
+                            const range = fn.xEnd - fn.xStart;
+                            for (let i = 0; i <= steps; i++) {
+                                const mx = fn.xStart + (i / steps) * range;
+                                const my = evaluateFunction(fn.expr, mx);
+                                if (mx >= viewport.xMin && mx <= viewport.xMax && my >= viewport.yMin && my <= viewport.yMax) {
+                                    const px = mapX(mx, viewport);
+                                    const py = mapY(my, viewport);
+                                    if (isFirst) {
+                                        ctx.moveTo(px, py);
+                                        isFirst = false;
+                                    } else {
+                                        ctx.lineTo(px, py);
+                                    }
+                                }
+                            }
+                            ctx.stroke();
+
+                            // Line elements serialization
+                            ctx.setLineDash([]);
+                            isFirst = true;
+                            let prevPx = 0, prevPy = 0;
+                            for (let i = 0; i <= steps; i++) {
+                                const mx = fn.xStart + (i / steps) * range;
+                                const my = evaluateFunction(fn.expr, mx);
+                                if (mx >= viewport.xMin && mx <= viewport.xMax && my >= viewport.yMin && my <= viewport.yMax) {
+                                    const px = mapX(mx, viewport);
+                                    const py = mapY(my, viewport);
+                                    if (!isFirst) {
+                                        slideElements.push({
+                                            type: "line", x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                            stroke: fn.stroke, stroke_width: fn.strokeWidth,
+                                            dasharray: fn.dasharray
+                                        });
+                                    }
+                                    prevPx = px;
+                                    prevPy = py;
+                                    isFirst = false;
+                                }
+                            }
+                        } else {
+                            // Parametric Curve Mode: X=f(t), Y=g(t)
+                            const tRange = fn.tEnd - fn.tStart;
+                            for (let i = 0; i <= steps; i++) {
+                                const t = fn.tStart + (i / steps) * tRange;
+                                const mx = evaluateFunction(fn.xExpr, 0, t);
+                                const my = evaluateFunction(fn.yExpr, 0, t);
+                                if (mx >= viewport.xMin && mx <= viewport.xMax && my >= viewport.yMin && my <= viewport.yMax) {
+                                    const px = mapX(mx, viewport);
+                                    const py = mapY(my, viewport);
+                                    if (isFirst) {
+                                        ctx.moveTo(px, py);
+                                        isFirst = false;
+                                    } else {
+                                        ctx.lineTo(px, py);
+                                    }
+                                }
+                            }
+                            ctx.stroke();
+
+                            // Line elements serialization
+                            ctx.setLineDash([]);
+                            isFirst = true;
+                            let prevPx = 0, prevPy = 0;
+                            for (let i = 0; i <= steps; i++) {
+                                const t = fn.tStart + (i / steps) * tRange;
+                                const mx = evaluateFunction(fn.xExpr, 0, t);
+                                const my = evaluateFunction(fn.yExpr, 0, t);
+                                if (mx >= viewport.xMin && mx <= viewport.xMax && my >= viewport.yMin && my <= viewport.yMax) {
+                                    const px = mapX(mx, viewport);
+                                    const py = mapY(my, viewport);
+                                    if (!isFirst) {
+                                        slideElements.push({
+                                            type: "line", x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                            stroke: fn.stroke, stroke_width: fn.strokeWidth,
+                                            dasharray: fn.dasharray
+                                        });
+                                    }
+                                    prevPx = px;
+                                    prevPy = py;
+                                    isFirst = false;
+                                }
+                            }
+                        }
+                    });
+
+                    // 7. Solve Differential Equations (Euler simulation)
+                    if (config.diffeq.active) {
+                        ctx.strokeStyle = config.diffeq.stroke;
+                        ctx.lineWidth = config.diffeq.strokeWidth;
+                        ctx.setLineDash([]);
+                        
+                        let x = parseFloat(config.diffeq.initX || 0.1);
+                        let y = parseFloat(config.diffeq.initY || 0);
+                        let z = parseFloat(config.diffeq.initZ || 0);
+                        const dt = parseFloat(config.diffeq.dt || 0.015);
+                        const steps = parseInt(config.diffeq.steps || 1000);
+                        
+                        const pts = [];
+                        
+                        // Evaluator function for ODE
+                        const evalDeriv = (expr, cx, cy, cz) => {
+                            try {
+                                let parsed = expr
+                                    .replace(/x/g, `(${cx})`)
+                                    .replace(/y/g, `(${cy})`)
+                                    .replace(/z/g, `(${cz})`)
+                                    .replace(/\^/g, "**");
+                                const fn = new Function("return " + parsed + ";");
+                                return fn();
+                            } catch(e) {
+                                return 0;
+                            }
+                        };
+                        
+                        for (let i = 0; i < steps; i++) {
+                            const dx = evalDeriv(config.diffeq.eqX, x, y, z);
+                            const dy = evalDeriv(config.diffeq.eqY, x, y, z);
+                            const dz = evalDeriv(config.diffeq.eqZ, x, y, z);
+                            x += dx * dt;
+                            y += dy * dt;
+                            z += dz * dt;
+                            pts.push({ x: x, y: z });
+                        }
+                        
+                        ctx.beginPath();
+                        let isFirst = true;
+                        pts.forEach((pt) => {
+                            if (pt.x >= viewport.xMin && pt.x <= viewport.xMax && pt.y >= viewport.yMin && pt.y <= viewport.yMax) {
+                                const px = mapX(pt.x, viewport);
+                                const py = mapY(pt.y, viewport);
+                                if (isFirst) {
+                                    ctx.moveTo(px, py);
+                                    isFirst = false;
+                                } else {
+                                    ctx.lineTo(px, py);
+                                }
+                            }
+                        });
+                        ctx.stroke();
+                        
+                        // Line elements serialization & native grouping
+                        isFirst = true;
+                        let prevPx = 0, prevPy = 0;
+                        const diffeqChildIds = [];
+                        let segmentCount = 0;
+                        pts.forEach((pt) => {
+                            if (pt.x >= viewport.xMin && pt.x <= viewport.xMax && pt.y >= viewport.yMin && pt.y <= viewport.yMax) {
+                                const px = mapX(pt.x, viewport);
+                                const py = mapY(pt.y, viewport);
+                                if (!isFirst) {
+                                    const segmentId = `diffeq_segment_${segmentCount++}`;
+                                    slideElements.push({
+                                        type: "line",
+                                        id: segmentId,
+                                        x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                        stroke: config.diffeq.stroke, stroke_width: config.diffeq.strokeWidth
+                                    });
+                                    diffeqChildIds.push(segmentId);
+                                }
+                                prevPx = px;
+                                prevPy = py;
+                                isFirst = false;
+                            }
+                        });
+
+                        // Add group element for differential equation curve
+                        if (diffeqChildIds.length > 0) {
+                            slideElements.push({
+                                type: "group",
+                                id: "diffeq_trajectory_group",
+                                childrenObjectIds: diffeqChildIds
+                            });
+                        }
+                    }
+
+                    // 8. Draw Custom Lines / Arrows
+                    config.lines.forEach((ln) => {
+                        if (!ln.active) return;
+                        const px1 = mapX(ln.x1, viewport);
+                        const py1 = mapY(ln.y1, viewport);
+                        const px2 = mapX(ln.x2, viewport);
+                        const py2 = mapY(ln.y2, viewport);
+                        
+                        ctx.strokeStyle = ln.stroke;
+                        ctx.lineWidth = ln.strokeWidth;
+                        
+                        if (ln.dasharray !== 'none') {
+                            const dash = ln.dasharray.split(',').map(Number);
+                            ctx.setLineDash(dash);
+                        } else {
+                            ctx.setLineDash([]);
+                        }
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(px1, py1);
+                        ctx.lineTo(px2, py2);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        if (ln.type === 'arrow') {
+                            drawArrowHead(ctx, px1, py1, px2, py2, ln.stroke, 12);
+                            slideElements.push({
+                                type: "arrow", x1: px1, y1: py1, x2: px2, y2: py2,
+                                stroke: ln.stroke, stroke_width: ln.strokeWidth
+                            });
+                        } else if (ln.type === 'double_arrow') {
+                            drawArrowHead(ctx, px1, py1, px2, py2, ln.stroke, 10);
+                            drawArrowHead(ctx, px2, py2, px1, py1, ln.stroke, 10);
+                            
+                            slideElements.push({
+                                type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                                stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
+                            });
+                        } else {
+                            slideElements.push({
+                                type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                                stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
+                            });
+                        }
+                    });
+
+                    // 9. Draw Phase Markers Range Double Arrows
+                    config.phaseMarkers.forEach((pm) => {
+                        if (!pm.active) return;
+                        const py = mapY(pm.yVal, viewport);
+                        const px1 = mapX(pm.xStart, viewport);
+                        const px2 = mapX(pm.xEnd, viewport);
+                        
+                        ctx.strokeStyle = pm.stroke;
+                        ctx.lineWidth = 2.0;
+                        ctx.setLineDash([]);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(px1, py);
+                        ctx.lineTo(px2, py);
+                        ctx.stroke();
+                        
+                        drawArrowHead(ctx, px1 + 10, py, px1, py, pm.stroke, 8);
+                        drawArrowHead(ctx, px2 - 10, py, px2, py, pm.stroke, 8);
+                        
+                        const pxMid = (px1 + px2) / 2.0;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(pxMid - 15, py - 12, 30, 24);
+                        ctx.strokeStyle = pm.stroke;
+                        ctx.strokeRect(pxMid - 15, py - 12, 30, 24);
+                        
+                        ctx.fillStyle = pm.stroke;
+                        ctx.font = 'bold 14px Ubuntu, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(pm.label, pxMid, py);
+                        
+                        slideElements.push({
+                            type: "line", x1: px1, y1: py, x2: px2, y2: py,
+                            stroke: pm.stroke, stroke_width: 2.0
+                        });
+                        slideElements.push({
+                            type: "rect", x: pxMid - 15, y: py - 12, width: 30, height: 24,
+                            fill: '#ffffff', stroke: pm.stroke, stroke_width: 1.0
+                        });
+                        slideElements.push({
+                            type: "text", x: pxMid, y: py, text: pm.label,
+                            font_size: 14, color: pm.stroke, bold: true, align: 'center'
+                        });
+                        
+                        ctx.strokeStyle = '#cccccc';
+                        ctx.lineWidth = 1.0;
+                        ctx.setLineDash([3, 3]);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(px1, py + 12);
+                        ctx.lineTo(px1, pyMin);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(px2, py + 12);
+                        ctx.lineTo(px2, pyMin);
+                        ctx.stroke();
+                        
+                        slideElements.push({
+                            type: "line", x1: px1, y1: py + 12, x2: px1, y2: pyMin,
+                            stroke: '#cccccc', stroke_width: 1.0, dasharray: "3,3"
+                        });
+                        slideElements.push({
+                            type: "line", x1: px2, y1: py + 12, x2: px2, y2: pyMin,
+                            stroke: '#cccccc', stroke_width: 1.0, dasharray: "3,3"
+                        });
+                    });
+
+                    // 10. Draw Points/Circles markers
+                    config.points.forEach((pt) => {
+                        if (!pt.active) return;
+                        const px = mapX(pt.x, viewport);
+                        const py = mapY(pt.y, viewport);
+                        const radius = parseFloat(pt.dotSize || 5);
+                        
+                        ctx.strokeStyle = pt.color;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.lineWidth = 2.0;
+                        ctx.setLineDash([]);
+                        
+                        ctx.beginPath();
+                        ctx.arc(px, py, radius, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.stroke();
+                        
+                        slideElements.push({
+                            type: "ellipse", x: px - radius, y: py - radius, width: radius * 2, height: radius * 2,
+                            stroke: pt.color, stroke_width: 2.0, fill: '#ffffff'
+                        });
+
+                        if (pt.label) {
+                            ctx.fillStyle = pt.color;
+                            ctx.font = 'bold italic 16px Ubuntu, sans-serif';
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(pt.label, px + 10, py - 10);
+                            
+                            slideElements.push({
+                                type: "text", x: px + 10, y: py - 10, text: pt.label,
+                                font_size: 16, color: pt.color, bold: true, italic: true, align: 'left'
+                            });
+                        }
+                    });
+
+                    // 11. Render Custom Text & LaTeX overlays
+                    config.textLabels.forEach((lbl) => {
+                        drawTextLabel(ctx, lbl, slideElements, katexLayer);
+                    });
+
+                    // Update compiled slides data
+                    this.slideData = {
+                        width: width,
+                        height: height,
+                        font_family: config.fontFamily,
+                        elements: slideElements
+                    };
+                };
+
+                const drawTextLabel = (ctx, lbl, slideElements, katexLayer) => {
+                    let px = 0, py = 0;
+                    if (lbl.coordinateMode === 'math') {
+                        const viewport = {
+                            xMin: config.viewport.xMin, xMax: config.viewport.xMax,
+                            yMin: config.viewport.yMin, yMax: config.viewport.yMax,
+                            marginLeft: config.viewport.marginLeft, marginRight: config.viewport.marginRight,
+                            marginTop: config.viewport.marginTop, marginBottom: config.viewport.marginBottom,
+                            plotWidth: config.canvasWidth - config.viewport.marginLeft - config.viewport.marginRight,
+                            plotHeight: config.canvasHeight - config.viewport.marginTop - config.viewport.marginBottom
+                        };
+                        px = mapX(lbl.x, viewport);
+                        py = mapY(lbl.y, viewport);
+                    } else {
+                        px = lbl.x;
+                        py = lbl.y;
+                    }
+                    
+                    if (lbl.isLatex && katexLayer) {
+                        const div = document.createElement('div');
+                        div.className = 'absolute pointer-events-none z-20 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center p-1 rounded';
+                        div.style.left = `${(px / config.canvasWidth) * 100}%`;
+                        div.style.top = `${(py / config.canvasHeight) * 100}%`;
+                        div.style.color = lbl.color;
+                        div.style.fontSize = `${lbl.fontSize}px`;
+                        if (lbl.maskBg) {
+                            div.style.backgroundColor = '#ffffff';
+                            div.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                        }
+                        
+                        try {
+                            katex.render(lbl.text, div, { throwOnError: false });
+                        } catch(err) {
+                            div.innerText = lbl.text;
+                        }
+                        katexLayer.appendChild(div);
+                    } else {
+                        ctx.fillStyle = lbl.color;
+                        ctx.font = `${lbl.bold ? 'bold' : ''} ${lbl.fontSize}px Ubuntu, sans-serif`;
+                        ctx.textAlign = lbl.align;
+                        ctx.textBaseline = 'middle';
+                        
+                        if (lbl.maskBg) {
+                            const measure = ctx.measureText(lbl.text);
+                            const w = measure.width + 10;
+                            const h = lbl.fontSize * 1.4;
+                            let tx = px;
+                            if (lbl.align === 'center') tx = px - w/2;
+                            else if (lbl.align === 'right') tx = px - w;
+                            
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(tx, py - h/2, w, h);
+                            ctx.fillStyle = lbl.color;
+                        }
+                        
+                        ctx.fillText(lbl.text, px, py);
+                    }
+
+                    slideElements.push({
+                        type: "text",
+                        x: px,
+                        y: py,
+                        text: lbl.text,
+                        font_size: lbl.fontSize,
+                        color: lbl.color,
+                        bold: lbl.bold,
+                        align: lbl.align,
+                        mask_bg: lbl.maskBg,
+                        is_latex: lbl.isLatex
+                    });
+                };
+
+                const mapX = (mathX, vp) => {
+                    const range = vp.xMax - vp.xMin;
+                    if (range === 0) return vp.marginLeft;
+                    const scale = vp.plotWidth / range;
+                    return vp.marginLeft + (mathX - vp.xMin) * scale;
+                };
+
+                const mapY = (mathY, vp) => {
+                    const range = vp.yMax - vp.yMin;
+                    if (range === 0) return vp.marginTop + vp.plotHeight;
+                    const scale = vp.plotHeight / range;
+                    return vp.marginTop + vp.plotHeight - (mathY - vp.yMin) * scale;
+                };
+
+                const drawArrowHead = (ctx, x1, y1, x2, y2, color, size) => {
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    ctx.save();
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(x2 - size * Math.cos(angle - Math.PI / 6), y2 - size * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(x2 - size * Math.cos(angle + Math.PI / 6), y2 - size * Math.sin(angle + Math.PI / 6));
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                };
+
+                // CHAT CONVERSATION AGENT COUPLING
+                const sendChatMessage = async () => {
+                    if (!chatInput.value.trim() || chatLoading.value) return;
+                    
+                    const query = chatInput.value;
+                    chatMessages.value.push({ role: 'user', text: query });
+                    chatInput.value = '';
+                    chatLoading.value = true;
+                    
+                    // Auto-scroll chat message container
+                    scrollChatToBottom();
+                    
+                    try {
+                        const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: query,
+                                config: config
+                            })
+                        });
+                        const res = await response.json();
+                        
+                        if (res.error) {
+                            throw new Error(res.message || res.error);
+                        }
+                        
+                        // If model returned a conversational message, add it to chat history
+                        if (res.message) {
+                            chatMessages.value.push({ role: 'assistant', text: res.message });
+                        }
+                        
+                        // Re-assign Vue configuration properties with the AI modified config
+                        if (res.config) {
+                            Object.keys(res.config).forEach((key) => {
+                                config[key] = res.config[key];
+                            });
+                            // Force canvas live redraw
+                            drawLivePreview();
+                        }
+                        
+                    } catch (e) {
+                        chatMessages.value.push({
+                            role: 'assistant',
+                            text: `Fout opgetreden bij verwerken van opdracht: ${e.message}`
+                        });
+                    } finally {
+                        chatLoading.value = false;
+                        scrollChatToBottom();
+                    }
+                };
+
+                const scrollChatToBottom = () => {
+                    setTimeout(() => {
+                        const container = document.getElementById('chat-messages-container');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    }, 50);
+                };
+
+                // API EXPORTS AND AUTHENTICATION STATE
+                const slideData = ref(null);
+                const loggedIn = ref(false);
+                const folders = ref([]);
+                const selectedFolder = ref(localStorage.getItem('fm_folder_id') || '');
+                const currentParent = ref('root');
+                const navHistory = ref([]);
+                const currentFolderName = ref(localStorage.getItem('fm_folder_name') || 'Root Folder');
+
+                const saveFolderSelection = () => {
+                    localStorage.setItem('fm_folder_id', selectedFolder.value);
+                    if (selectedFolder.value) {
+                        const folderObj = folders.value.find(f => f.id === selectedFolder.value);
+                        if (folderObj) {
+                            currentFolderName.value = folderObj.name;
+                            localStorage.setItem('fm_folder_name', folderObj.name);
+                        }
+                    } else {
+                        currentFolderName.value = 'Root Folder';
+                        localStorage.setItem('fm_folder_name', 'Root Folder');
+                    }
+                };
+
+                const fetchFolders = async (parentId = 'root') => {
+                    try {
+                        currentParent.value = parentId;
+                        const response = await fetch(`/api/folders?parent=${parentId}`);
+                        const res = await response.json();
+                        if (res.success) {
+                            folders.value = res.folders;
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch folders:", e);
+                    }
+                };
+
+                const openSelectedFolder = () => {
+                    if (!selectedFolder.value) return;
+                    
+                    const folderObj = folders.value.find(f => f.id === selectedFolder.value);
+                    const folderName = folderObj ? folderObj.name : 'Subfolder';
+                    
+                    navHistory.value.push({
+                        id: currentParent.value,
+                        name: currentFolderName.value
+                    });
+                    
+                    currentFolderName.value = folderName;
+                    const nextParent = selectedFolder.value;
+                    selectedFolder.value = '';
+                    fetchFolders(nextParent);
+                    saveFolderSelection();
+                };
+
+                const goBackFolder = () => {
+                    if (navHistory.value.length === 0) return;
+                    
+                    const previous = navHistory.value.pop();
+                    currentFolderName.value = previous.name;
+                    fetchFolders(previous.id);
+                    
+                    selectedFolder.value = '';
+                    saveFolderSelection();
+                };
+
+                const checkAuthStatus = async () => {
+                    try {
+                        const response = await fetch('/api/auth/status');
+                        const res = await response.json();
+                        loggedIn.value = res.logged_in;
+                        if (loggedIn.value) {
+                            fetchFolders('root');
+                        }
+                    } catch (e) {
+                        console.error("Failed to check auth status:", e);
+                    }
+                };
+
+                const exportToPresentation = async () => {
+                    status.loading = true;
+                    status.message = 'Converting current slide canvas...';
+                    status.type = 'info';
+                    status.url = '';
+
+                    try {
+                        const response = await fetch('/api/export', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                slide_data: this.slideData,
+                                folder_id: selectedFolder.value
+                            })
+                        });
+                        const res = await response.json();
+                        
+                        if (res.success) {
+                            uploadedPresentationId.value = res.id;
+                            localStorage.setItem('fm_presentation_id', res.id);
+                            status.type = 'success';
+                            status.message = res.warning ? `Exported with warnings: ${res.warning}` : 'Slide Presentation Created!';
+                            status.url = res.url;
+                        } else {
+                            throw new Error(res.error || 'Server rejected creation');
+                        }
+                    } catch (e) {
+                        status.type = 'error';
+                        status.message = `Export failed: ${e.message}`;
+                    } finally {
+                        status.loading = false;
+                    }
+                };
+
+                const appendSlideToPresentation = async () => {
+                    if (!uploadedPresentationId.value) return;
+                    status.loading = true;
+                    status.message = 'Appending as new slide card...';
+                    status.type = 'info';
+
+                    try {
+                        const response = await fetch('/api/append', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                presentation_id: uploadedPresentationId.value,
+                                slide_data: this.slideData
+                            })
+                        });
+                        const res = await response.json();
+                        
+                        if (res.success) {
+                            status.type = 'success';
+                            status.message = 'Slide appended successfully!';
+                            status.url = res.url;
+                        } else {
+                            throw new Error(res.error || 'Server rejected append');
+                        }
+                    } catch(e) {
+                        status.type = 'error';
+                        status.message = `Append failed: ${e.message}`;
+                    } finally {
+                        status.loading = false;
+                    }
+                };
+
+                const copyId = () => {
+                    navigator.clipboard.writeText(uploadedPresentationId.value);
+                    alert("Presentation ID copied to clipboard!");
+                };
+
+                const downloadSVG = () => {
+                    const svgWidth = config.canvasWidth;
+                    const svgHeight = config.canvasHeight;
+                    const elements = this.slideData.elements;
+                    
+                    let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">\n`;
+                    svgContent += `<rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />\n`;
+                    
+                    elements.forEach((el) => {
+                        if (el.type === 'rect') {
+                            svgContent += `  <rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.stroke_width}" />\n`;
+                        } else if (el.type === 'ellipse') {
+                            svgContent += `  <ellipse cx="${el.x + el.width/2}" cy="${el.y + el.height/2}" rx="${el.width/2}" ry="${el.height/2}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.stroke_width}" />\n`;
+                        } else if (el.type === 'line') {
+                            const dash = el.dasharray && el.dasharray !== 'none' ? ` stroke-dasharray="${el.dasharray}"` : '';
+                            svgContent += `  <line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.stroke_width}"${dash} />\n`;
+                        } else if (el.type === 'arrow') {
+                            svgContent += `  <line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.stroke_width}" marker-end="url(#arrow)" />\n`;
+                        } else if (el.type === 'text') {
+                            svgContent += `  <text x="${el.x}" y="${el.y}" font-family="Ubuntu" font-size="${el.font_size}" fill="${el.color}" text-anchor="${el.align === 'center' ? 'middle' : (el.align === 'right' ? 'end' : 'start')}">${el.text}</text>\n`;
+                        }
+                    });
+                    
+                    svgContent += '</svg>';
+                    
+                    const blob = new Blob([svgContent], {type: 'image/svg+xml'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${selectedPreset.value}_diagram.svg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+
+                // Watchers for config changes to automatically redraw canvas
+                watch(config, () => {
+                    drawLivePreview();
+                }, { deep: true });
+
+                onMounted(() => {
+                    loadPreset();
+                    checkAuthStatus();
+                });
+
+                return {
+                    loggedIn,
+                    folders,
+                    selectedFolder,
+                    currentFolderName,
+                    navHistory,
+                    openSelectedFolder,
+                    goBackFolder,
+                    activeSections,
+                    selectedPreset,
+                    config,
+                    uploadedPresentationId,
+                    status,
+                    statusClass,
+                    statusIcon,
+                    toggleSection,
+                    addFunction,
+                    addParametricFunction,
+                    removeFunction,
+                    leerlevelsColors,
+                    addHatch,
+                    removeHatch,
+                    addPhaseMarker,
+                    removePhaseMarker,
+                    addPoint,
+                    removePoint,
+                    addLine,
+                    removeLine,
+                    addTextLabel,
+                    removeTextLabel,
+                    loadPreset,
+                    exportToPresentation,
+                    appendSlideToPresentation,
+                    copyId,
+                    downloadSVG,
+                    slideData,
+                    
+                    // Chat integration
+                    chatExpanded,
+                    chatInput,
+                    chatLoading,
+                    chatMessages,
+                    sendChatMessage
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+# ==============================================================================
+# Leerlevels Figuremaker .gitignore
+# ==============================================================================
+
+# Python Bytecode and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables and Configuration Secrets (MUST NEVER BE PUBLIC)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Google API Credentials and Tokens (CRITICAL: Do not upload to public git repositories)
+credentials.json
+credentials copy.json
+credentials*.json
+client_secret*.json
+service_account.json
+service_account_backup.json
+service_account*.json
+token.json
+token*.json
+
+# Project/Local Temp & Analysis Outputs
+temp_analysis/
+.roo/
+
+# Generated Test Outputs (avoid cluttering repository with locally run figure tests)
+test_*.svg
+test_*.json
+test_*.png
+test_koppelmoment.svg
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
