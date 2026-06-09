@@ -1,0 +1,56 @@
+# This file specifies files to ignore when uploading a project to Google Cloud Run.
+# Unlike .gitignore, this file allows uploading sensitive credentials (.env, credentials.json, service_account.json)
+# to your private Google Cloud build/deployment context, which is necessary for the app to function properly.
+#
+# DO NOT remove .env, credentials.json, service_account.json from .gitignore!
+# Keep them in .gitignore so they are never committed to your public Git repository.
+
+# Ignore git folder and git settings
+.git/
+.gitignore
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Project/Local Temp & Analysis Outputs
+temp_analysis/
+.roo/
+
+# Generated Test Outputs (local files from running tests)
+test_*.svg
+test_*.json
+test_*.png
+test_koppelmoment.svg
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
