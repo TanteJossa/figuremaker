@@ -382,12 +382,19 @@ The diagram configuration schema supports these settings:
    - `fontFamily` (string, default "Ubuntu")
 2. Viewport mathematics bounds:
    - `viewport`: { xMin, xMax, yMin, yMax, marginLeft, marginRight, marginTop, marginBottom } (all numbers)
-3. Grid ticks settings:
-   - `grid`: { show, xStep, yStep, dutchComma, showFrame, frameColor, frameWidth } (show is bool, dutchComma is bool, showFrame is bool, others are numbers/strings)
+3. Grid ticks and layout settings:
+   - `grid`: { show, xStep, yStep, dutchComma, showFrame, frameColor, frameWidth, boundaryStyle, xBreak, yBreak, isMultiGrid, rows, cols, gapX, gapY, cellTitles }
+     - `boundaryStyle`: "box" or "arrows" (controls whether to draw a full enclosing rectangle box or traditional math x/y arrow axes)
+     - `xBreak`, `yBreak`: boolean values to render zigzag scale breaks
+     - `isMultiGrid`: boolean. Set to true to split the widescreen canvas into a structured grid/dashboard of independent viewports
+     - `rows`, `cols`: numbers (e.g. 2, 3) representing sub-grid dimensions
+     - `gapX`, `gapY`: number of physical presentation points separating cell viewports
+     - `cellTitles`: object mapping cell coordinates key `"row_col"` (e.g. `"0_0"`, `"1_0"`) to string cell titles
 4. Mathematical Curves / Functions:
    - `functions`: Array of function objects. Each object can be standard OR parametric.
-     - Standard: { expr: "string (e.g. '0.16 * sin(pi * x)')", stroke: "color hex", strokeWidth: number, xStart: number, xEnd: number, dasharray: "none|4,4|2,2", active: bool, isParametric: false }
-     - Parametric: { xExpr: "string (e.g. 'cos(t)')", yExpr: "string (e.g. 'sin(t)')", stroke: "color hex", strokeWidth: number, tStart: number, tEnd: number, dasharray: "none|4,4|2,2", active: bool, isParametric: true }
+     - Standard: { expr: "string (e.g. '0.16 * sin(pi * x)')", stroke: "color hex", strokeWidth: number, xStart: number, xEnd: number, dasharray: "none|4,4|2,2", active: bool, isParametric: false, cell: { row: number, col: number } }
+     - Parametric: { xExpr: "string (e.g. 'cos(t)')", yExpr: "string (e.g. 'sin(t)')", stroke: "color hex", strokeWidth: number, tStart: number, tEnd: number, dasharray: "none|4,4|2,2", active: bool, isParametric: true, cell: { row: number, col: number } }
+     - **CELL MAPPING:** When `grid.isMultiGrid` is true, you MUST map each curve to its specific panel viewport using `cell: { row: number, col: number }` (0-indexed).
 5. Shading Hatch regions:
    - `hatches`: Array of { topFunc: "string", bottomFunc: "string", xStart: number, xEnd: number, stroke: "color hex", stepPt: number, active: bool }
 6. Phase arrow range markers:
@@ -412,13 +419,16 @@ Instructions:
         # Initialize Google GenAI client
         client = genai.Client()
         
-        # Call Generate Content
+        # Call Generate Content with high thinking level
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=user_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                thinking_config=types.ThinkingConfig(
+                    thinking_level="high"
+                )
             )
         )
         

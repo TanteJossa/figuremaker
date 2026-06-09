@@ -285,6 +285,20 @@
                                     <label class="block font-medium text-gray-600 mb-1">Vertical Gap</label>
                                     <input type="number" v-model.number="config.grid.gapY" class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue" />
                                 </div>
+                                <div class="col-span-2 pt-2 border-t border-gray-200 mt-2">
+                                    <label class="block font-bold text-gray-700 mb-1.5">Cell Viewport Titles</label>
+                                    <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        <div v-for="r in Array.from({length: config.grid.rows || 2}, (_, i) => i)" :key="r" class="space-y-1.5">
+                                            <div v-for="c in Array.from({length: config.grid.cols || 3}, (_, i) => i)" :key="c" class="flex items-center gap-2">
+                                                <span class="text-[10px] text-gray-500 font-mono w-14 shrink-0">Cell [[r]],[[c]]:</span>
+                                                <input type="text" 
+                                                       v-model="config.grid.cellTitles[`${r}_${c}`]" 
+                                                       placeholder="e.g. Constant velocity" 
+                                                       class="w-full bg-white border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-brand-blue text-xs" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -379,7 +393,7 @@
                                     </div>
                                 </div>
 
-                                <div v-if="config.grid.isMultiGrid && fn.cell" class="grid grid-cols-3 gap-2 border-t border-gray-200 pt-2.5">
+                                <div v-if="config.grid.isMultiGrid && fn.cell" class="grid grid-cols-2 gap-2 border-t border-gray-200 pt-2.5">
                                     <div>
                                         <label class="block font-medium text-gray-600 mb-0.5">Cell Row</label>
                                         <input type="number" v-model.number="fn.cell.row" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
@@ -387,10 +401,6 @@
                                     <div>
                                         <label class="block font-medium text-gray-600 mb-0.5">Cell Col</label>
                                         <input type="number" v-model.number="fn.cell.col" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
-                                    </div>
-                                    <div>
-                                        <label class="block font-medium text-gray-600 mb-0.5">Cell Title</label>
-                                        <input type="text" v-model="fn.label" class="w-full bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-brand-blue" />
                                     </div>
                                 </div>
                             </div>
@@ -1086,7 +1096,8 @@
                         gapY: 55,
                         boundaryStyle: 'box',
                         xBreak: false,
-                        yBreak: false
+                        yBreak: false,
+                        cellTitles: {}
                     },
                     functions: [],
                     hatches: [],
@@ -1468,6 +1479,14 @@
                         config.grid.cols = 3;
                         config.grid.gapX = 55;
                         config.grid.gapY = 55;
+                        config.grid.cellTitles = {
+                            '0_0': 'Constant v: x(t)',
+                            '1_0': 'Constant v: v(t)',
+                            '0_1': 'Constant a: x(t)',
+                            '1_1': 'Constant a: v(t)',
+                            '0_2': 'Stilstand: x(t)',
+                            '1_2': 'Stilstand: v(t)'
+                        };
 
                         // Grand Header
                         config.textLabels.push(
@@ -1475,12 +1494,12 @@
                         );
                         
                         config.functions.push(
-                            { expr: 'x', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant v: x(t)', cell: {row: 0, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
-                            { expr: '1', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant v: v(t)', cell: {row: 1, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
-                            { expr: '0.18 * x^2', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant a: x(t)', cell: {row: 0, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
-                            { expr: '0.36 * x', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Constant a: v(t)', cell: {row: 1, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
-                            { expr: '3', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Stilstand: x(t)', cell: {row: 0, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
-                            { expr: '0', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, label: 'Stilstand: v(t)', cell: {row: 1, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 }
+                            { expr: 'x', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 0, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '1', stroke: '#38761d', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 1, col: 0}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0.18 * x^2', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 0, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0.36 * x', stroke: '#0b5394', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 1, col: 1}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '3', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 0, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 },
+                            { expr: '0', stroke: '#980000', strokeWidth: 2.5, xStart: 0, xEnd: 5, dasharray: 'none', active: true, cell: {row: 1, col: 2}, isParametric: false, xExpr: '', yExpr: '', tStart: 0, tEnd: 0 }
                         );
                     } else if (selectedPreset.value === 'minimal') {
                         // Reset to standard minimal diagram view
@@ -1548,179 +1567,408 @@
                         const gapX = config.grid.gapX || 55;
                         const gapY = config.grid.gapY || 55;
                         
-                        config.functions.forEach((fn) => {
-                            if (!fn.active || !fn.cell) return;
-                            const cellRow = fn.cell.row;
-                            const cellCol = fn.cell.col;
-                            
-                            // Map grid coordinate limits
-                            const cellWidth = (width - config.viewport.marginLeft - config.viewport.marginRight - (numCols - 1) * gapX) / numCols;
-                            const cellHeight = (height - config.viewport.marginTop - config.viewport.marginBottom - (numRows - 1) * gapY) / numRows;
-                            
-                            const cellLeft = config.viewport.marginLeft + cellCol * (cellWidth + gapX);
-                            const cellTop = config.viewport.marginTop + cellRow * (cellHeight + gapY);
-                            
-                            const cellRight = width - (cellLeft + cellWidth);
-                            const cellBottom = height - (cellTop + cellHeight);
-                            
-                            // Create temporary cell viewport mapping
-                            const cellViewport = {
-                                xMin: config.viewport.xMin,
-                                xMax: config.viewport.xMax,
-                                yMin: config.viewport.yMin,
-                                yMax: config.viewport.yMax,
-                                marginLeft: cellLeft,
-                                marginRight: cellRight,
-                                marginTop: cellTop,
-                                marginBottom: cellBottom,
-                                plotWidth: cellWidth,
-                                plotHeight: cellHeight
-                            };
-                            
-                            // 1. Draw cell enclosing boundary
-                            ctx.strokeStyle = '#444444';
-                            ctx.lineWidth = 1.5;
-                            ctx.strokeRect(cellLeft, cellTop, cellWidth, cellHeight);
-                            
-                            slideElements.push({
-                                type: 'rect', x: cellLeft, y: cellTop, width: cellWidth, height: cellHeight,
-                                fill: 'none', stroke: '#444444', stroke_width: 1.5
-                            });
-                            
-                            // 2. Draw cell dashed grid lines & ticks
-                            ctx.lineWidth = 0.5;
-                            ctx.strokeStyle = '#eeeeee';
-                            ctx.fillStyle = '#666666';
-                            ctx.font = '10px Ubuntu, sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            
-                            // Verticals
-                            for (let x_val = cellViewport.xMin + 1; x_val < cellViewport.xMax; x_val += config.grid.xStep) {
-                                const px = mapX(x_val, cellViewport);
-                                ctx.beginPath();
-                                ctx.setLineDash([3, 3]);
-                                ctx.moveTo(px, cellTop);
-                                ctx.lineTo(px, cellTop + cellHeight);
-                                ctx.stroke();
+                        const cellViewports = {};
+                        
+                        for (let r = 0; r < numRows; r++) {
+                            for (let c = 0; c < numCols; c++) {
+                                // Map grid coordinate limits
+                                const cellWidth = (width - config.viewport.marginLeft - config.viewport.marginRight - (numCols - 1) * gapX) / numCols;
+                                const cellHeight = (height - config.viewport.marginTop - config.viewport.marginBottom - (numRows - 1) * gapY) / numRows;
                                 
-                                slideElements.push({
-                                    type: 'line', x1: px, y1: cellTop, x2: px, y2: cellTop + cellHeight,
-                                    stroke: '#eeeeee', stroke_width: 1.0, dasharray: '3,3'
-                                });
+                                const cellLeft = config.viewport.marginLeft + c * (cellWidth + gapX);
+                                const cellTop = config.viewport.marginTop + r * (cellHeight + gapY);
                                 
-                                // tick x
-                                let x_rounded = parseFloat(x_val.toFixed(4));
-                                ctx.fillText(x_rounded, px, cellTop + cellHeight + 12);
-                                slideElements.push({
-                                    type: 'text', x: px, y: cellTop + cellHeight + 12, text: x_rounded.toString(),
-                                    font_size: 10, color: '#666666', align: 'center'
-                                });
-                            }
-                            // Horizontals
-                            for (let y_val = cellViewport.yMin + 1; y_val < cellViewport.yMax; y_val += config.grid.yStep) {
-                                const py = mapY(y_val, cellViewport);
-                                ctx.beginPath();
-                                ctx.setLineDash([3, 3]);
-                                ctx.moveTo(cellLeft, py);
-                                ctx.lineTo(cellLeft + cellWidth, py);
-                                ctx.stroke();
+                                const cellRight = width - (cellLeft + cellWidth);
+                                const cellBottom = height - (cellTop + cellHeight);
                                 
-                                slideElements.push({
-                                    type: 'line', x1: cellLeft, y1: py, x2: cellLeft + cellWidth, y2: py,
-                                    stroke: '#eeeeee', stroke_width: 1.0, dasharray: '3,3'
-                                });
+                                const cellViewport = {
+                                    xMin: config.viewport.xMin,
+                                    xMax: config.viewport.xMax,
+                                    yMin: config.viewport.yMin,
+                                    yMax: config.viewport.yMax,
+                                    marginLeft: cellLeft,
+                                    marginRight: cellRight,
+                                    marginTop: cellTop,
+                                    marginBottom: cellBottom,
+                                    plotWidth: cellWidth,
+                                    plotHeight: cellHeight
+                                };
                                 
-                                // tick y
-                                let y_rounded = parseFloat(y_val.toFixed(4));
-                                ctx.fillText(y_rounded, cellLeft - 10, py);
-                                slideElements.push({
-                                    type: 'text', x: cellLeft - 10, y: py, text: y_rounded.toString(),
-                                    font_size: 10, color: '#666666', align: 'right'
-                                });
-                            }
-                            
-                            // Axis arrows (standard bottom-left labels)
-                            // t label x-axis
-                            ctx.fillStyle = '#000000';
-                            ctx.font = 'italic bold 11px Ubuntu, sans-serif';
-                            ctx.textAlign = 'left';
-                            ctx.fillText('t', cellLeft + cellWidth + 8, cellTop + cellHeight);
-                            slideElements.push({
-                                type: 'text', x: cellLeft + cellWidth + 8, y: cellTop + cellHeight, text: 't',
-                                font_size: 11, color: '#000000', bold: true, italic: true, align: 'left'
-                            });
-                            
-                            // y label y-axis
-                            const yLabel = cellRow === 0 ? 'x' : 'v';
-                            ctx.textAlign = 'center';
-                            ctx.fillText(yLabel, cellLeft, cellTop - 12);
-                            slideElements.push({
-                                type: 'text', x: cellLeft, y: cellTop - 12, text: yLabel,
-                                font_size: 11, color: '#000000', bold: true, italic: true, align: 'center'
-                            });
-                            
-                            // Cell title
-                            ctx.fillStyle = '#0b5394';
-                            ctx.font = 'bold 11px Ubuntu, sans-serif';
-                            ctx.fillText(fn.label, cellLeft + cellWidth/2, cellTop - 15);
-                            slideElements.push({
-                                type: 'text', x: cellLeft + cellWidth/2, y: cellTop - 15, text: fn.label,
-                                font_size: 11, color: '#0b5394', bold: true, align: 'center'
-                            });
-                            
-                            // Draw Function
-                            ctx.strokeStyle = fn.stroke;
-                            ctx.lineWidth = fn.strokeWidth;
-                            ctx.setLineDash([]);
-                            ctx.beginPath();
-                            
-                            let isFirst = true;
-                            const steps = 150;
-                            const range = fn.xEnd - fn.xStart;
-                            
-                            for (let i = 0; i <= steps; i++) {
-                                const mx = fn.xStart + (i / steps) * range;
-                                const my = evaluateFunction(fn.expr, mx);
-                                if (mx >= cellViewport.xMin && mx <= cellViewport.xMax && my >= cellViewport.yMin && my <= cellViewport.yMax) {
-                                    const px = mapX(mx, cellViewport);
-                                    const py = mapY(my, cellViewport);
-                                    if (isFirst) {
-                                        ctx.moveTo(px, py);
-                                        isFirst = false;
-                                    } else {
-                                        ctx.lineTo(px, py);
+                                cellViewports[`${r}_${c}`] = cellViewport;
+                                
+                                const boundaryStyle = config.grid.boundaryStyle || 'box';
+                                const pxMin = cellLeft;
+                                const pxMax = cellLeft + cellWidth;
+                                const pyMin = cellTop + cellHeight; // bottom edge
+                                const pyMax = cellTop;             // top edge
+                                
+                                // 1. Cell Frame or Arrows boundary
+                                if (boundaryStyle === 'box') {
+                                    ctx.strokeStyle = config.grid.frameColor || '#444444';
+                                    ctx.lineWidth = config.grid.frameWidth || 1.5;
+                                    ctx.strokeRect(cellLeft, cellTop, cellWidth, cellHeight);
+                                    
+                                    slideElements.push({
+                                        type: 'rect', x: cellLeft, y: cellTop, width: cellWidth, height: cellHeight,
+                                        fill: 'none', stroke: config.grid.frameColor || '#444444', stroke_width: config.grid.frameWidth || 1.5
+                                    });
+                                } else if (boundaryStyle === 'arrows') {
+                                    const yAxisPos = (cellViewport.yMin <= 0.0 && cellViewport.yMax >= 0.0) ? 0.0 : cellViewport.yMin;
+                                    const xAxisPos = (cellViewport.xMin <= 0.0 && cellViewport.xMax >= 0.0) ? 0.0 : cellViewport.xMin;
+                                    const pyAxis = mapY(yAxisPos, cellViewport);
+                                    const pxAxis = mapX(xAxisPos, cellViewport);
+                                    
+                                    ctx.strokeStyle = '#000000';
+                                    ctx.lineWidth = 1.8;
+                                    ctx.setLineDash([]);
+                                    
+                                    // X-axis arrow
+                                    ctx.beginPath();
+                                    ctx.moveTo(pxMin, pyAxis);
+                                    ctx.lineTo(pxMax, pyAxis);
+                                    ctx.stroke();
+                                    drawArrowHead(ctx, pxMin, pyAxis, pxMax + 8, pyAxis, '#000000', 6);
+                                    slideElements.push({
+                                        type: "arrow", x1: pxMin, y1: pyAxis, x2: pxMax + 8, y2: pyAxis,
+                                        stroke: '#000000', stroke_width: 1.8
+                                    });
+                                    
+                                    // Y-axis arrow
+                                    ctx.beginPath();
+                                    ctx.moveTo(pxAxis, pyMin);
+                                    ctx.lineTo(pxAxis, pyMax);
+                                    ctx.stroke();
+                                    drawArrowHead(ctx, pxAxis, pyMin, pxAxis, pyMax - 8, '#000000', 6);
+                                    slideElements.push({
+                                        type: "arrow", x1: pxAxis, y1: pyMin, x2: pxAxis, y2: pyMax - 8,
+                                        stroke: '#000000', stroke_width: 1.8
+                                    });
+                                }
+                                
+                                // 2. Cell Dashed Grid Lines
+                                const cellGridLines = [];
+                                if (config.grid.show) {
+                                    ctx.lineWidth = 0.5;
+                                    ctx.strokeStyle = '#eeeeee';
+                                    ctx.setLineDash([3, 3]);
+                                    
+                                    // Verticals
+                                    if (config.grid.xStep > 0) {
+                                        let startVal = Math.ceil(cellViewport.xMin / config.grid.xStep) * config.grid.xStep;
+                                        for (let x_val = startVal; x_val < cellViewport.xMax; x_val += config.grid.xStep) {
+                                            if (Math.abs(x_val - cellViewport.xMin) < 1e-5 || Math.abs(x_val - cellViewport.xMax) < 1e-5) continue;
+                                            const px = mapX(x_val, cellViewport);
+                                            ctx.beginPath();
+                                            ctx.moveTo(px, pyMax);
+                                            ctx.lineTo(px, pyMin);
+                                            ctx.stroke();
+                                            
+                                            cellGridLines.push({
+                                                type: 'line', x1: px, y1: pyMax, x2: px, y2: pyMin,
+                                                stroke: '#eeeeee', stroke_width: 0.5, dasharray: '3,3'
+                                            });
+                                        }
+                                    }
+                                    
+                                    // Horizontals
+                                    if (config.grid.yStep > 0) {
+                                        let startVal = Math.ceil(cellViewport.yMin / config.grid.yStep) * config.grid.yStep;
+                                        for (let y_val = startVal; y_val < cellViewport.yMax; y_val += config.grid.yStep) {
+                                            if (Math.abs(y_val - cellViewport.yMin) < 1e-5 || Math.abs(y_val - cellViewport.yMax) < 1e-5) continue;
+                                            const py = mapY(y_val, cellViewport);
+                                            ctx.beginPath();
+                                            ctx.moveTo(pxMin, py);
+                                            ctx.lineTo(pxMax, py);
+                                            ctx.stroke();
+                                            
+                                            cellGridLines.push({
+                                                type: 'line', x1: pxMin, y1: py, x2: pxMax, y2: py,
+                                                stroke: '#eeeeee', stroke_width: 0.5, dasharray: '3,3'
+                                            });
+                                        }
                                     }
                                 }
-                            }
-                            ctx.stroke();
-                            
-                            // Serialize function line to slides vector primitives
-                            isFirst = true;
-                            let prevPx = 0, prevPy = 0;
-                            for (let i = 0; i <= steps; i++) {
-                                const mx = fn.xStart + (i / steps) * range;
-                                const my = evaluateFunction(fn.expr, mx);
-                                if (mx >= cellViewport.xMin && mx <= cellViewport.xMax && my >= cellViewport.yMin && my <= cellViewport.yMax) {
-                                    const px = mapX(mx, cellViewport);
-                                    const py = mapY(my, cellViewport);
-                                    if (!isFirst) {
+                                
+                                if (cellGridLines.length > 0) {
+                                    const childIds = [];
+                                    const gridTimeId = Math.random().toString(36).substr(2, 4);
+                                    cellGridLines.forEach((el, elIdx) => {
+                                        const cid = `mg_g_${gridTimeId}_${elIdx}`;
+                                        el.id = cid;
+                                        slideElements.push(el);
+                                        childIds.push(cid);
+                                    });
+                                    slideElements.push({
+                                        type: "group",
+                                        id: `g_mg_grid_${gridTimeId}`,
+                                        childrenObjectIds: childIds
+                                    });
+                                }
+                                
+                                // 3. Ticks and numeric Labels for cell
+                                ctx.fillStyle = '#666666';
+                                ctx.font = '10px Ubuntu, sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.setLineDash([]);
+                                
+                                const yAxisPos = (cellViewport.yMin <= 0.0 && cellViewport.yMax >= 0.0 && boundaryStyle === 'arrows') ? 0.0 : cellViewport.yMin;
+                                const xAxisPos = (cellViewport.xMin <= 0.0 && cellViewport.xMax >= 0.0 && boundaryStyle === 'arrows') ? 0.0 : cellViewport.xMin;
+                                const pyAxisLabel = mapY(yAxisPos, cellViewport);
+                                const pxAxisLabel = mapX(xAxisPos, cellViewport);
+                                
+                                // X ticks
+                                if (config.grid.xStep > 0) {
+                                    let startVal = Math.ceil(cellViewport.xMin / config.grid.xStep) * config.grid.xStep;
+                                    for (let x_val = startVal; x_val <= cellViewport.xMax; x_val += config.grid.xStep) {
+                                        const px = mapX(x_val, cellViewport);
+                                        let x_rounded = parseFloat(x_val.toFixed(4));
+                                        let lbl = x_rounded.toString();
+                                        if (config.grid.dutchComma) {
+                                            lbl = lbl.replace('.', ',');
+                                        }
+                                        ctx.fillText(lbl, px, pyAxisLabel + 12);
                                         slideElements.push({
-                                            type: 'line', x1: prevPx, y1: prevPy, x2: px, y2: py,
-                                            stroke: fn.stroke, stroke_width: fn.strokeWidth
+                                            type: 'text', x: px, y: pyAxisLabel + 12, text: lbl,
+                                            font_size: 10, color: '#666666', align: 'center',
+                                            width: 40, height: 16
                                         });
                                     }
-                                    prevPx = px;
-                                    prevPy = py;
-                                    isFirst = false;
+                                }
+                                
+                                 // Y ticks
+                                if (config.grid.yStep > 0) {
+                                    ctx.textAlign = 'right';
+                                    let startVal = Math.ceil(cellViewport.yMin / config.grid.yStep) * config.grid.yStep;
+                                    for (let y_val = startVal; y_val <= cellViewport.yMax; y_val += config.grid.yStep) {
+                                        const py = mapY(y_val, cellViewport);
+                                        let y_rounded = parseFloat(y_val.toFixed(4));
+                                        let lbl = y_rounded.toString();
+                                        if (config.grid.dutchComma) {
+                                            lbl = lbl.replace('.', ',');
+                                        }
+                                        ctx.fillText(lbl, pxAxisLabel - 10, py);
+                                        slideElements.push({
+                                            type: 'text', x: pxAxisLabel - 10, y: py, text: lbl,
+                                            font_size: 10, color: '#666666', align: 'right',
+                                            width: 40, height: 16
+                                        });
+                                    }
+                                }
+                                
+                                // 4. Axis names
+                                ctx.fillStyle = '#000000';
+                                ctx.font = 'italic bold 11px Ubuntu, sans-serif';
+                                ctx.textAlign = 'left';
+                                ctx.fillText('t', pxMax + 8, pyAxisLabel);
+                                slideElements.push({
+                                    type: 'text', x: pxMax + 8, y: pyAxisLabel, text: 't',
+                                    font_size: 11, color: '#000000', bold: true, italic: true, align: 'left',
+                                    width: 24, height: 16
+                                });
+                                
+                                const cellYLabel = r === 0 ? 'x' : 'v';
+                                ctx.textAlign = 'center';
+                                ctx.fillText(cellYLabel, pxAxisLabel, pyMax - 12);
+                                slideElements.push({
+                                    type: 'text', x: pxAxisLabel, y: pyMax - 12, text: cellYLabel,
+                                    font_size: 11, color: '#000000', bold: true, italic: true, align: 'center',
+                                    width: 24, height: 16
+                                });
+                                
+                                // Find cell title
+                                const cellTitle = config.grid.cellTitles && config.grid.cellTitles[`${r}_${c}`];
+                                if (cellTitle) {
+                                    ctx.fillStyle = '#0b5394';
+                                    ctx.font = 'bold 11px Ubuntu, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.fillText(cellTitle, cellLeft + cellWidth/2, cellTop - 15);
+                                    slideElements.push({
+                                        type: 'text', x: cellLeft + cellWidth/2, y: cellTop - 15, text: cellTitle,
+                                        font_size: 11, color: '#0b5394', bold: true, align: 'center',
+                                        width: 150, height: 20
+                                    });
+                                }
+                            }
+                        }
+                        
+                        // NOW DRAW ALL ACTIVE FUNCTIONS MAPPED TO THE MULTIGRID
+                        config.functions.forEach((fn) => {
+                            if (!fn.active || !fn.cell) return;
+                            const cv = cellViewports[`${fn.cell.row}_${fn.cell.col}`];
+                            if (!cv) return;
+                            
+                            ctx.strokeStyle = fn.stroke;
+                            ctx.lineWidth = fn.strokeWidth;
+                            
+                            if (fn.dasharray !== 'none') {
+                                const dash = fn.dasharray.split(',').map(Number);
+                                ctx.setLineDash(dash);
+                            } else {
+                                ctx.setLineDash([]);
+                            }
+                            
+                            ctx.beginPath();
+                            let isFirst = true;
+                            const steps = 150;
+                            
+                            if (!fn.isParametric) {
+                                const range = fn.xEnd - fn.xStart;
+                                for (let i = 0; i <= steps; i++) {
+                                    const mx = fn.xStart + (i / steps) * range;
+                                    const my = evaluateFunction(fn.expr, mx);
+                                    if (mx >= cv.xMin && mx <= cv.xMax && my >= cv.yMin && my <= cv.yMax) {
+                                        const px = mapX(mx, cv);
+                                        const py = mapY(my, cv);
+                                        if (isFirst) {
+                                            ctx.moveTo(px, py);
+                                            isFirst = false;
+                                        } else {
+                                            ctx.lineTo(px, py);
+                                        }
+                                    }
+                                }
+                                ctx.stroke();
+                                
+                                isFirst = true;
+                                let prevPx = 0, prevPy = 0;
+                                const cellCurveLines = [];
+                                for (let i = 0; i <= steps; i++) {
+                                    const mx = fn.xStart + (i / steps) * range;
+                                    const my = evaluateFunction(fn.expr, mx);
+                                    if (mx >= cv.xMin && mx <= cv.xMax && my >= cv.yMin && my <= cv.yMax) {
+                                        const px = mapX(mx, cv);
+                                        const py = mapY(my, cv);
+                                        if (!isFirst) {
+                                            cellCurveLines.push({
+                                                type: 'line', x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                                stroke: fn.stroke, stroke_width: fn.strokeWidth
+                                            });
+                                        }
+                                        prevPx = px;
+                                        prevPy = py;
+                                        isFirst = false;
+                                    }
+                                }
+                                
+                                if (cellCurveLines.length > 0) {
+                                    const childIds = [];
+                                    const curveTimeId = Math.random().toString(36).substr(2, 4);
+                                    cellCurveLines.forEach((el, elIdx) => {
+                                        const cid = `mg_c_${curveTimeId}_${elIdx}`;
+                                        el.id = cid;
+                                        slideElements.push(el);
+                                        childIds.push(cid);
+                                    });
+                                    slideElements.push({
+                                        type: "group",
+                                        id: `g_mg_c_${curveTimeId}`,
+                                        childrenObjectIds: childIds
+                                    });
+                                }
+                            } else {
+                                const tRange = fn.tEnd - fn.tStart;
+                                for (let i = 0; i <= steps; i++) {
+                                    const t = fn.tStart + (i / steps) * tRange;
+                                    const mx = evaluateFunction(fn.xExpr, 0, t);
+                                    const my = evaluateFunction(fn.yExpr, 0, t);
+                                    if (mx >= cv.xMin && mx <= cv.xMax && my >= cv.yMin && my <= cv.yMax) {
+                                        const px = mapX(mx, cv);
+                                        const py = mapY(my, cv);
+                                        if (isFirst) {
+                                            ctx.moveTo(px, py);
+                                            isFirst = false;
+                                        } else {
+                                            ctx.lineTo(px, py);
+                                        }
+                                    }
+                                }
+                                ctx.stroke();
+                                
+                                isFirst = true;
+                                let prevPx = 0, prevPy = 0;
+                                const cellCurveLines = [];
+                                for (let i = 0; i <= steps; i++) {
+                                    const t = fn.tStart + (i / steps) * tRange;
+                                    const mx = evaluateFunction(fn.xExpr, 0, t);
+                                    const my = evaluateFunction(fn.yExpr, 0, t);
+                                    if (mx >= cv.xMin && mx <= cv.xMax && my >= cv.yMin && my <= cv.yMax) {
+                                        const px = mapX(mx, cv);
+                                        const py = mapY(my, cv);
+                                        if (!isFirst) {
+                                            cellCurveLines.push({
+                                                type: 'line', x1: prevPx, y1: prevPy, x2: px, y2: py,
+                                                stroke: fn.stroke, stroke_width: fn.strokeWidth, dasharray: fn.dasharray
+                                            });
+                                        }
+                                        prevPx = px;
+                                        prevPy = py;
+                                        isFirst = false;
+                                    }
+                                }
+                                
+                                if (cellCurveLines.length > 0) {
+                                    const childIds = [];
+                                    const curveTimeId = Math.random().toString(36).substr(2, 4);
+                                    cellCurveLines.forEach((el, elIdx) => {
+                                        const cid = `mg_p_${curveTimeId}_${elIdx}`;
+                                        el.id = cid;
+                                        slideElements.push(el);
+                                        childIds.push(cid);
+                                    });
+                                    slideElements.push({
+                                        type: "group",
+                                        id: `g_mg_p_${curveTimeId}`,
+                                        childrenObjectIds: childIds
+                                    });
                                 }
                             }
                         });
                         
+                        // 2. Shading regions mapped to cell
+                        config.hatches.forEach((ht) => {
+                            if (!ht.active) return;
+                            const cv = ht.cell ? cellViewports[`${ht.cell.row}_${ht.cell.col}`] : cellViewports['0_0'];
+                            if (!cv) return;
+                            drawHatchInsideViewport(ctx, ht, cv, slideElements);
+                        });
+                        
+                        // 3. Phase Markers mapped to cell
+                        config.phaseMarkers.forEach((pm) => {
+                            if (!pm.active) return;
+                            const cv = pm.cell ? cellViewports[`${pm.cell.row}_${pm.cell.col}`] : cellViewports['0_0'];
+                            if (!cv) return;
+                            drawPhaseMarkerInsideViewport(ctx, pm, cv, slideElements);
+                        });
+                        
+                        // 4. Highlight Points mapped to cell
+                        config.points.forEach((pt) => {
+                            if (!pt.active) return;
+                            const cv = pt.cell ? cellViewports[`${pt.cell.row}_${pt.cell.col}`] : cellViewports['0_0'];
+                            if (!cv) return;
+                            drawPointInsideViewport(ctx, pt, cv, slideElements);
+                        });
+                        
+                        // 5. Lines/Arrows mapped to cell
+                        config.lines.forEach((ln) => {
+                            if (!ln.active) return;
+                            const cv = ln.cell ? cellViewports[`${ln.cell.row}_${ln.cell.col}`] : cellViewports['0_0'];
+                            if (!cv) return;
+                            drawLineInsideViewport(ctx, ln, cv, slideElements);
+                        });
+                        
                         // Draw any custom text labels for Multigrid
                         config.textLabels.forEach((lbl) => {
-                            drawTextLabel(ctx, lbl, slideElements, katexLayer);
+                            const cv = lbl.cell ? cellViewports[`${lbl.cell.row}_${lbl.cell.col}`] : null;
+                            drawTextLabel(ctx, lbl, slideElements, katexLayer, cv);
                         });
+                        
+                        this.slideData = {
+                            width: width,
+                            height: height,
+                            font_family: config.fontFamily,
+                            elements: slideElements
+                        };
                         
                         return; // Done multi grid
                     }
@@ -1745,6 +1993,7 @@
                     const pyMax = viewport.marginTop;             // top edge
 
                     const axesElements = [];
+                    const gridElements = [];
                     const doXBreak = config.grid.xBreak || (config.grid.xBreak !== false && (viewport.xMin > 0.1 || viewport.xMax < -0.1));
                     const doYBreak = config.grid.yBreak || (config.grid.yBreak !== false && (viewport.yMin > 0.1 || viewport.yMax < -0.1));
 
@@ -1765,7 +2014,7 @@
                                 ctx.lineTo(px, pyMin);
                                 ctx.stroke();
                                 
-                                axesElements.push({
+                                gridElements.push({
                                     type: "line", x1: px, y1: pyMax, x2: px, y2: pyMin,
                                     stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
                                 });
@@ -1784,12 +2033,28 @@
                                 ctx.lineTo(pxMax, py);
                                 ctx.stroke();
                                 
-                                axesElements.push({
+                                gridElements.push({
                                     type: "line", x1: pxMin, y1: py, x2: pxMax, y2: py,
                                     stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
                                 });
                             }
                         }
+                    }
+
+                    if (gridElements.length > 0) {
+                        const childIds = [];
+                        const gridTimeId = Math.random().toString(36).substr(2, 4);
+                        gridElements.forEach((el, index) => {
+                            const cid = `grid_c_${gridTimeId}_${index}`;
+                            el.id = cid;
+                            slideElements.push(el);
+                            childIds.push(cid);
+                        });
+                        slideElements.push({
+                            type: "group",
+                            id: `g_grid_${gridTimeId}`,
+                            childrenObjectIds: childIds
+                        });
                     }
 
                     // Ticks/Labels axes positions
@@ -2055,7 +2320,8 @@
                             
                             slideElements.push({
                                 type: "text", x: px, y: pyAxisLabel + 20, text: lbl,
-                                font_size: 16, color: '#000000', align: 'center'
+                                font_size: 16, color: '#000000', align: 'center',
+                                width: 60, height: 24
                             });
                         }
                     }
@@ -2077,7 +2343,8 @@
                             
                             slideElements.push({
                                 type: "text", x: pxAxisLabel - 15, y: py, text: lbl,
-                                font_size: 16, color: '#000000', align: 'right'
+                                font_size: 16, color: '#000000', align: 'right',
+                                width: 60, height: 24
                             });
                         }
                     }
@@ -2122,6 +2389,7 @@
                             ctx.setLineDash([]);
                             isFirst = true;
                             let prevPx = 0, prevPy = 0;
+                            const standardCurveLines = [];
                             for (let i = 0; i <= steps; i++) {
                                 const mx = fn.xStart + (i / steps) * range;
                                 const my = evaluateFunction(fn.expr, mx);
@@ -2129,7 +2397,7 @@
                                     const px = mapX(mx, viewport);
                                     const py = mapY(my, viewport);
                                     if (!isFirst) {
-                                        slideElements.push({
+                                        standardCurveLines.push({
                                             type: "line", x1: prevPx, y1: prevPy, x2: px, y2: py,
                                             stroke: fn.stroke, stroke_width: fn.strokeWidth,
                                             dasharray: fn.dasharray
@@ -2139,6 +2407,22 @@
                                     prevPy = py;
                                     isFirst = false;
                                 }
+                            }
+
+                            if (standardCurveLines.length > 0) {
+                                const childIds = [];
+                                const curveTimeId = Math.random().toString(36).substr(2, 4);
+                                standardCurveLines.forEach((el, elIdx) => {
+                                    const cid = `cs_${curveTimeId}_${elIdx}`;
+                                    el.id = cid;
+                                    slideElements.push(el);
+                                    childIds.push(cid);
+                                });
+                                slideElements.push({
+                                    type: "group",
+                                    id: `gc_${curveTimeId}`,
+                                    childrenObjectIds: childIds
+                                });
                             }
                         } else {
                             // Parametric Curve Mode: X=f(t), Y=g(t)
@@ -2164,6 +2448,7 @@
                             ctx.setLineDash([]);
                             isFirst = true;
                             let prevPx = 0, prevPy = 0;
+                            const parametricCurveLines = [];
                             for (let i = 0; i <= steps; i++) {
                                 const t = fn.tStart + (i / steps) * tRange;
                                 const mx = evaluateFunction(fn.xExpr, 0, t);
@@ -2172,7 +2457,7 @@
                                     const px = mapX(mx, viewport);
                                     const py = mapY(my, viewport);
                                     if (!isFirst) {
-                                        slideElements.push({
+                                        parametricCurveLines.push({
                                             type: "line", x1: prevPx, y1: prevPy, x2: px, y2: py,
                                             stroke: fn.stroke, stroke_width: fn.strokeWidth,
                                             dasharray: fn.dasharray
@@ -2182,6 +2467,22 @@
                                     prevPy = py;
                                     isFirst = false;
                                 }
+                            }
+
+                            if (parametricCurveLines.length > 0) {
+                                const childIds = [];
+                                const curveTimeId = Math.random().toString(36).substr(2, 4);
+                                parametricCurveLines.forEach((el, elIdx) => {
+                                    const cid = `ps_${curveTimeId}_${elIdx}`;
+                                    el.id = cid;
+                                    slideElements.push(el);
+                                    childIds.push(cid);
+                                });
+                                slideElements.push({
+                                    type: "group",
+                                    id: `gp_${curveTimeId}`,
+                                    childrenObjectIds: childIds
+                                });
                             }
                         }
                     });
@@ -2440,10 +2741,10 @@
                     };
                 };
 
-                const drawTextLabel = (ctx, lbl, slideElements, katexLayer) => {
+                const drawTextLabel = (ctx, lbl, slideElements, katexLayer, cellViewport) => {
                     let px = 0, py = 0;
                     if (lbl.coordinateMode === 'math') {
-                        const viewport = {
+                        const viewport = cellViewport || {
                             xMin: config.viewport.xMin, xMax: config.viewport.xMax,
                             yMin: config.viewport.yMin, yMax: config.viewport.yMax,
                             marginLeft: config.viewport.marginLeft, marginRight: config.viewport.marginRight,
@@ -2510,6 +2811,189 @@
                         mask_bg: lbl.maskBg,
                         is_latex: lbl.isLatex
                     });
+                };
+
+                const drawHatchInsideViewport = (ctx, ht, viewport, slideElements) => {
+                    ctx.strokeStyle = ht.stroke;
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([]);
+                    
+                    const stepPt = parseFloat(ht.stepPt || 4.0);
+                    const mathStart = ht.xStart;
+                    const mathEnd = ht.xEnd;
+                    
+                    const screenStart = mapX(mathStart, viewport);
+                    const screenEnd = mapX(mathEnd, viewport);
+                    
+                    const pyMin = viewport.marginTop + viewport.plotHeight;
+                    const pyMax = viewport.marginTop;
+                    
+                    for (let sx = screenStart; sx <= screenEnd; sx += stepPt) {
+                        const mx = viewport.xMin + ((sx - viewport.marginLeft) / viewport.plotWidth) * (viewport.xMax - viewport.xMin);
+                        const valTop = evaluateFunction(ht.topFunc, mx);
+                        const valBottom = evaluateFunction(ht.bottomFunc, mx);
+                        
+                        const syTop = mapY(valTop, viewport);
+                        const syBottom = mapY(valBottom, viewport);
+                        
+                        if (syTop >= pyMax && syTop <= pyMin && syBottom >= pyMax && syBottom <= pyMin) {
+                            ctx.beginPath();
+                            ctx.moveTo(sx, syBottom);
+                            ctx.lineTo(sx, syTop);
+                            ctx.stroke();
+                            
+                            slideElements.push({
+                                type: "line", x1: sx, y1: syBottom, x2: sx, y2: syTop,
+                                stroke: ht.stroke, stroke_width: 1.5
+                            });
+                        }
+                    }
+                };
+
+                const drawPhaseMarkerInsideViewport = (ctx, pm, viewport, slideElements) => {
+                    const py = mapY(pm.yVal, viewport);
+                    const px1 = mapX(pm.xStart, viewport);
+                    const px2 = mapX(pm.xEnd, viewport);
+                    
+                    const pyMin = viewport.marginTop + viewport.plotHeight;
+                    
+                    ctx.strokeStyle = pm.stroke;
+                    ctx.lineWidth = 2.0;
+                    ctx.setLineDash([]);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(px1, py);
+                    ctx.lineTo(px2, py);
+                    ctx.stroke();
+                    
+                    drawArrowHead(ctx, px1 + 10, py, px1, py, pm.stroke, 8);
+                    drawArrowHead(ctx, px2 - 10, py, px2, py, pm.stroke, 8);
+                    
+                    const pxMid = (px1 + px2) / 2.0;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(pxMid - 15, py - 12, 30, 24);
+                    ctx.strokeStyle = pm.stroke;
+                    ctx.strokeRect(pxMid - 15, py - 12, 30, 24);
+                    
+                    ctx.fillStyle = pm.stroke;
+                    ctx.font = 'bold 14px Ubuntu, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pm.label, pxMid, py);
+                    
+                    slideElements.push({
+                        type: "line", x1: px1, y1: py, x2: px2, y2: py,
+                        stroke: pm.stroke, stroke_width: 2.0
+                    });
+                    slideElements.push({
+                        type: "rect", x: pxMid - 15, y: py - 12, width: 30, height: 24,
+                        fill: '#ffffff', stroke: pm.stroke, stroke_width: 1.0
+                    });
+                    slideElements.push({
+                        type: "text", x: pxMid, y: py, text: pm.label,
+                        font_size: 14, color: pm.stroke, bold: true, align: 'center'
+                    });
+                    
+                    ctx.strokeStyle = '#cccccc';
+                    ctx.lineWidth = 1.0;
+                    ctx.setLineDash([3, 3]);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(px1, py + 12);
+                    ctx.lineTo(px1, pyMin);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(px2, py + 12);
+                    ctx.lineTo(px2, pyMin);
+                    ctx.stroke();
+                    
+                    slideElements.push({
+                        type: "line", x1: px1, y1: py + 12, x2: px1, y2: pyMin,
+                        stroke: '#cccccc', stroke_width: 1.0, dasharray: "3,3"
+                    });
+                    slideElements.push({
+                        type: "line", x1: px2, y1: py + 12, x2: px2, y2: pyMin,
+                        stroke: '#cccccc', stroke_width: 1.0, dasharray: "3,3"
+                    });
+                };
+
+                const drawPointInsideViewport = (ctx, pt, viewport, slideElements) => {
+                    const px = mapX(pt.x, viewport);
+                    const py = mapY(pt.y, viewport);
+                    const radius = parseFloat(pt.dotSize || 10.0) / 2.0;
+                    
+                    ctx.strokeStyle = pt.color;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.lineWidth = 2.0;
+                    ctx.setLineDash([]);
+                    
+                    ctx.beginPath();
+                    ctx.arc(px, py, radius, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    slideElements.push({
+                        type: "ellipse", x: px - radius, y: py - radius, width: radius * 2, height: radius * 2,
+                        stroke: pt.color, stroke_width: 2.0, fill: '#ffffff'
+                    });
+
+                    if (pt.label) {
+                        ctx.fillStyle = pt.color;
+                        ctx.font = 'bold italic 16px Ubuntu, sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(pt.label, px + 10, py - 10);
+                        
+                        slideElements.push({
+                            type: "text", x: px + 10, y: py - 10, text: pt.label,
+                            font_size: 16, color: pt.color, bold: true, italic: true, align: 'left'
+                        });
+                    }
+                };
+
+                const drawLineInsideViewport = (ctx, ln, viewport, slideElements) => {
+                    const px1 = mapX(ln.x1, viewport);
+                    const py1 = mapY(ln.y1, viewport);
+                    const px2 = mapX(ln.x2, viewport);
+                    const py2 = mapY(ln.y2, viewport);
+                    
+                    ctx.strokeStyle = ln.stroke;
+                    ctx.lineWidth = ln.strokeWidth;
+                    
+                    if (ln.dasharray !== 'none') {
+                        const dash = ln.dasharray.split(',').map(Number);
+                        ctx.setLineDash(dash);
+                    } else {
+                        ctx.setLineDash([]);
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(px1, py1);
+                    ctx.lineTo(px2, py2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    if (ln.type === 'arrow') {
+                        drawArrowHead(ctx, px1, py1, px2, py2, ln.stroke, 12);
+                        slideElements.push({
+                            type: "arrow", x1: px1, y1: py1, x2: px2, y2: py2,
+                            stroke: ln.stroke, stroke_width: ln.strokeWidth
+                        });
+                    } else if (ln.type === 'double_arrow') {
+                        drawArrowHead(ctx, px1, py1, px2, py2, ln.stroke, 10);
+                        drawArrowHead(ctx, px2, py2, px1, py1, ln.stroke, 10);
+                        
+                        slideElements.push({
+                            type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                            stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
+                        });
+                    } else {
+                        slideElements.push({
+                            type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                            stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
+                        });
+                    }
                 };
 
                 const mapX = (mathX, vp) => {

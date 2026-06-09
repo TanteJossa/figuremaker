@@ -1,0 +1,54 @@
+{
+  "id": "leerlevels-figuremaker",
+  "title": "Leerlevels Figuremaker: High-Performance Educational Graphing & Vector Tool",
+  "date": "2026-06-08T12:00:00.000Z",
+  "rank": 2,
+  "tags": [
+    "Vector Graphics",
+    "Google Slides API",
+    "Math Rendering",
+    "LaTeX Pipeline",
+    "AI Automation",
+    "Python",
+    "GCP",
+    "TailwindCSS",
+    "Deterministic Graphing"
+  ],
+  "github": "https://github.com/TanteJossa/leerlevels-figuremaker",
+  "status": "Live",
+  "team": [
+    "Joost Koch"
+  ],
+  "technologies": [
+    "Python 3.11",
+    "Flask",
+    "Google Slides REST API",
+    "Google Drive API",
+    "Google OAuth 2.0",
+    "LaTeX (pdflatex, dvisvgm)",
+    "Inkscape CLI",
+    "Gemini API (gemini-3.5-flash)",
+    "TailwindCSS",
+    "HTML5 Canvas",
+    "Docker",
+    "Google Cloud Run",
+    "Gunicorn"
+  ],
+  "description": "This project represents a complete and rigorous overhaul of the **Leerlevels Figuremaker**, transitioning it from an unstable, AI-dependent raster/vector generator into a high-performance, deterministic, web-based mathematical graphing tool tailored for educational publishers. The core achievement of this system is its ability to generate highly complex, mathematically precise graphs directly into Google Slides or Google Drawings as **native, 100% editable vector objects** (grouped paths, styled text boxes, arrow shapes) rather than flat images.\n\nThis allows curriculum developers and educators to modify curves, reposition labels, or tweak styling parameters in-situ without needing to re-generate the figures. The entire core of the drawing system is implemented in [`leerlevels_style.py`](leerlevels_style.py) and [`graph_engine.py`](graph_engine.py), providing standard styling colors, text masking, and coordinate systems.\n\n#### Core Technical Architecture & Achievements:\n\n*   **Frontend SPA & Interactive Canvas Engine:**\n    *   **Modern SPA Interface:** Built with TailwindCSS and a responsive accordion configuration pane, allowing users to tweak plotting ranges, function definitions, grid spacings, and styling parameters on the fly.\n    *   **Live Preview Engine:** Utilizes an HTML5 Canvas implementation that mirrors the complex backend configurations in real-time. This interactive frontend maps Cartesian math coordinates to screen space dynamically, allowing educators to preview mathematical equations instantly before executing the Google Slides push.\n    *   **Dynamic Preset System:** Loads structured configurations for trigonometric functions, standard physics curves (parabolas, waves), parametric equations, and complex chaotic attractors (like the Lorenz Attractor) instantly.\n\n*   **High-Performance Deterministic Viewport Mapping:**\n    *   **Two-Dimensional Translation:** In [`graph_engine.py`](graph_engine.py), the [`Viewport`](graph_engine.py) class performs precise mathematical translation of Cartesian graph spaces $[x_{min}, x_{max}] \\times [y_{min}, y_{max}]$ onto inverted physical slide point spaces (PT) using scale ratios and dynamic margins for labels.\n    *   **Axis Break (Scheurlijn) Logic:** Automatically detects when ranges start above zero or end below zero and renders professional zig-zag axis breaks to maintain visual integrity.\n    *   **Boundary Styling:** Supports both traditional rectangular frames and modern \"stealth arrow\" axis endings where the X and Y axes terminate with arrowheads instead of a closed box.\n\n*   **Advanced Curve & Area Rendering:**\n    *   **Hatch Area Shading:** Since the Google Slides API lacks native freeform polygon fills, shaded areas are simulated using a high-density vertical line hatching algorithm that segments along curve boundaries, creating professional arcering (hatching) effects.\n    *   **Differential Equation Solver:** Implements an Euler method solver to render complex looping phase portraits such as the Lorenz Attractor with dozens of parametric loops and turns.\n    *   **Parametric & Standard Functions:** Full support for both standard y=f(x) equations and parametric (x(t), y(t)) definitions with customizable discretization density.\n\n*   **LaTeX Mathematical Typesetting Pipeline:**\n    *   **End-to-End Compilation:** Robust backend pipeline converts mathematical formulas into perfectly cropped, transparent, high-DPI PNG images using the flow: `LaTeX Text → pdflatex → DVI/PDF → dvisvgm → SVG → inkscape --export-area-drawing → Transparent cropped PNG`.\n    *   **Native Overlay:** Generated math PNGs are uploaded to Google Drive and inserted seamlessly as slide images at exact coordinates, maintaining full editability of surrounding vector elements.\n    *   **Ubuntu Font Consistency:** All text and equations render using the project-mandated Ubuntu font family to match Leerlevels brand guidelines.\n\n*   **Google Slides Native Object Generation:**\n    *   **Atomic Shape Creation:** Uses the Google Slides REST API to stage and push atomic shape creations (lines, arrows, text boxes) directly, avoiding any rasterization so teachers can manually edit labels or move lines after generation.\n    *   **Advanced Object Grouping:** Programmatically groups hundreds of line segments (e.g., 200+ segments of a sine wave) into single, easily selectable and draggable objects inside Google Slides using the `groupObjects` endpoint.\n    *   **Z-Order & Masking:** Implements precise layering and background masking to ensure text remains crisp and elements do not overlap incorrectly.\n\n*   **Secure Google OAuth & Drive Integration:**\n    *   **User-Centric Authentication:** Google OAuth 2.0 integration via Flask sessions. Users authenticate to use their personal Drive tokens securely; no API keys are ever exposed to the client.\n    *   **Recursive Folder Picker:** Built a custom recursive Google Drive folder listing tree directly querying via `/api/folders`, completely bypassing restrictive Google Picker API key constraints for seamless output folder selection.\n\n*   **AI-Assisted Configuration Generation:**\n    *   **Strict JSON Schema Prompting:** The `/api/generate` endpoint leverages Gemini with a highly strict, TypeScript-interfaced JSON schema system prompt (defined in [`prompt_template.py`](prompt_template.py)). This translates natural language descriptions into precise coordinate and parameter JSON configurations that the deterministic math engine can consume without hallucination.\n\n*   **Production Deployment & Containerization:**\n    *   **Dockerfile Optimization:** Fully containerized with a robust `Dockerfile` bundling Python 3.11, system LaTeX binaries (`texlive-latex-extra`, `texlive-science`), Inkscape, and dvisvgm.\n    *   **Cloud Run Compatibility:** Handled serverless constraints by writing all intermediate compilation files exclusively to the writable `/tmp` system directory, preventing read-only filesystem crash errors. Server runs via Gunicorn on port 8080.\n\nThe system was validated through multiple test pipelines (`test_graph_sinus.py`, `test_graph_area.py`, `test_graph_phases.py`, `test_graph_grid.py`, `test_graph_stacked.py`, `test_graph_diffeq.py`) confirming perfect coordinate accuracy, native grouping, LaTeX rendering, and OAuth flows before Cloud Run deployment.",
+  "images": [
+    "sine_wave_clean.png",
+    "normal_distribution_hatched.png",
+    "lorenz_attractor_phase.png",
+    "supply_demand_equilibrium.png",
+    "kinematics_axis_break.png",
+    "fourier_multigrid_dashboard.png",
+    "archimedean_spiral_parametric.png",
+    "schrodinger_latex_overlay.png",
+    "geometric_vectors_stealth.png",
+    "thermodynamic_pv_cycle.png",
+    "preview_engine_ui.png",
+    "config_accordion_cards.png",
+    "recursive_folder_picker.png",
+    "google_oauth_screen.png"
+  ]
+}
