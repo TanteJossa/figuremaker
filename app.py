@@ -571,5 +571,106 @@ def export():
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/write_clipboard', methods=['POST'])
+def write_clipboard():
+    logger.info("Received request to write to system clipboard via local Python backend.")
+    data = request.json or {}
+    wrapped_str = data.get("wrapped")
+    flat_str = data.get("flat")
+    clip_id = data.get("clip_id", "2519a9aa-7fff-ab00-1255-47f90648ed96")
+    fallback_text = data.get("fallback_text", "[Google Slides Graph Data]")
+    
+    if not wrapped_str:
+        return jsonify({"success": False, "error": "No wrapped payload provided."}), 400
+        
+    import os
+    if os.name != 'nt':
+        logger.warning("Clipboard writing is only supported on Windows local development servers.")
+        return jsonify({"success": False, "error": "Clipboard writing only supported on local Windows host."}), 400
+        
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        
+        # Define argument and return types for 64-bit safety
+        user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+        user32.OpenClipboard.restype = ctypes.c_bool
+        user32.CloseClipboard.argtypes = []
+        user32.CloseClipboard.restype = ctypes.c_bool
+        user32.EmptyClipboard.argtypes = []
+        user32.EmptyClipboard.restype = ctypes.c_bool
+        user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+        user32.SetClipboardData.restype = ctypes.c_void_p
+        user32.RegisterClipboardFormatW.argtypes = [ctypes.c_wchar_p]
+        user32.RegisterClipboardFormatW.restype = ctypes.c_uint
+        
+        kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalUnlock.restype = ctypes.c_bool
+        
+        GMEM_MOVEABLE = 0x0002
+        CF_CHROMIUM_CUSTOM = user32.RegisterClipboardFormatW("Chromium Web Custom MIME Data Format")
+        CF_UNICODETEXT = 13
+        
+        # Build custom mime pairs
+        pairs = []
+        if wrapped_str:
+            pairs.append(("application/x-vnd.google-docs-drawings-object+wrapped", wrapped_str))
+        if clip_id:
+            pairs.append(("application/x-vnd.google-docs-internal-clip-id", clip_id))
+            
+        # Encode the custom pairs
+        raw_data = b""
+        for k, v in pairs:
+            raw_data += len(k).to_bytes(4, "little") + k.encode("utf-16le")
+            if len(k) % 2 != 0:
+                raw_data += b"\0\0"
+            raw_data += len(v).to_bytes(4, "little") + v.encode("utf-16le")
+            if len(v) % 2 != 0:
+                raw_data += b"\0\0"
+                
+        total_data = len(pairs).to_bytes(4, "little") + raw_data
+        raw_custom_bytes = len(total_data).to_bytes(4, "little") + total_data
+        
+        if not user32.OpenClipboard(None):
+            logger.error("Failed to open clipboard.")
+            return jsonify({"success": False, "error": "Failed to open clipboard."}), 500
+            
+        try:
+            user32.EmptyClipboard()
+            
+            # Write custom format
+            h_mem = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(raw_custom_bytes))
+            if h_mem:
+                p_mem = kernel32.GlobalLock(h_mem)
+                if p_mem:
+                    ctypes.memmove(p_mem, raw_custom_bytes, len(raw_custom_bytes))
+                    kernel32.GlobalUnlock(h_mem)
+                    user32.SetClipboardData(CF_CHROMIUM_CUSTOM, h_mem)
+                    
+            # Write fallback text
+            if fallback_text:
+                text_bytes = (fallback_text + "\0").encode("utf-16le")
+                h_text = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(text_bytes))
+                if h_text:
+                    p_text = kernel32.GlobalLock(h_text)
+                    if p_text:
+                        ctypes.memmove(p_text, text_bytes, len(text_bytes))
+                        kernel32.GlobalUnlock(h_text)
+                        user32.SetClipboardData(CF_UNICODETEXT, h_text)
+                        
+            logger.info("Successfully wrote custom drawing data to host clipboard via ctypes.")
+            return jsonify({"success": True})
+        finally:
+            user32.CloseClipboard()
+    except Exception as e:
+        logger.error(f"Failed to write to clipboard via ctypes: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000, debug=True)

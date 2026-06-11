@@ -892,6 +892,18 @@
                             Append as New Slide
                         </button>
                         
+                        <!-- Copy to Google Slides Clipboard -->
+                        <button @click="copyToGoogleSlides" class="bg-green-700 hover:bg-green-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm transition-all text-xs flex items-center gap-2 cursor-pointer" title="Copy to clipboard as Google Slides native shapes">
+                            <i class="fa-solid fa-copy"></i>
+                            Copy to Google Slides
+                        </button>
+                        
+                        <!-- Copy Test Shape -->
+                        <button @click="copyTestShape" class="bg-gray-600 hover:bg-gray-700 text-white font-bold px-3 py-2 rounded-lg shadow-sm transition-all text-xs flex items-center gap-1.5 cursor-pointer" title="Copy a simple test rectangle to diagnose clipboard issues">
+                            <i class="fa-solid fa-flask"></i>
+                            Copy Test Shape
+                        </button>
+                        
                         <!-- Download SVG -->
                         <button @click="downloadSVG" class="bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 font-bold px-3 py-2 rounded-lg transition-all text-xs flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-download"></i>
@@ -922,6 +934,23 @@
                     <div class="w-full max-w-[720px] flex justify-between mt-3 px-1 text-[11px] text-gray-400">
                         <span>Workspace: 720x405 PT (Widescreen Slide)</span>
                         <span>Drag config cards on the sidebar to update live</span>
+                    </div>
+                </div>
+
+                <!-- Clipboard Diagnostic Tool -->
+                <div class="w-full max-w-[720px] mt-6 p-5 bg-yellow-50 rounded-xl border border-yellow-200 shadow-sm text-xs space-y-3 shrink-0">
+                    <h3 class="font-bold text-sm text-yellow-800 flex items-center gap-1.5 border-b border-yellow-200 pb-2">
+                        <i class="fa-solid fa-flask"></i> Google Slides Clipboard Diagnostics & Reverse-Engineering
+                    </h3>
+                    <p class="text-yellow-700 font-medium">
+                        To help us reverse-engineer the exact format Google Slides expects, select any shape inside Google Slides, copy it (Ctrl+C), click inside the box below, and paste (Ctrl+V).
+                    </p>
+                    <div class="flex flex-col gap-2">
+                        <textarea id="paste-diagnostic-area" placeholder="Click here and press Ctrl+V to paste your Google Slides shape..." class="w-full h-36 p-3 bg-white border border-yellow-300 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-yellow-500 font-mono text-[10px] text-gray-800 leading-normal" readonly></textarea>
+                        <div class="flex justify-between items-center text-[10px] text-yellow-600">
+                            <span>MIME Type intercepted: <strong id="paste-mime-type" class="bg-yellow-200 px-1.5 py-0.5 rounded">None</strong></span>
+                            <button id="copy-log-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold px-3 py-1 rounded transition-all cursor-pointer">Copy Diagnostic Log</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1012,6 +1041,304 @@
 
     <script>
         const { createApp, ref, reactive, onMounted, watch } = Vue;
+
+        // Translator function to convert frontend canvas elements into Google's proprietary pageElements JSON format
+        function convertToGoogleSlidesJSON(elements, fontFamily) {
+            if (!elements) {
+                return {
+                    flat: JSON.stringify({ resolved: [], unresolved: [] }),
+                    wrapped: JSON.stringify({ dih: 1245482604, data: "{}" })
+                };
+            }
+
+            // 1. Sort the elements according to the advanced Z-ordering layers
+            function getElementZIndex(el) {
+                if (!el) return 1;
+                const type = el.type || '';
+                const id = (el.id || '').toLowerCase();
+                const stroke = (el.stroke || '').toLowerCase();
+                const text = el.text !== undefined && el.text !== null ? String(el.text) : '';
+
+                // Layer 5 (Top): Graph Title
+                const isTitle = type === 'text' && (
+                    id.includes('title') ||
+                    text.includes('Lorenz') || text.includes('Lissajous') || text.includes('Overzicht') ||
+                    (((el.font_size !== undefined ? el.font_size : el.fontSize) >= 18) && el.bold && !el.is_latex && !el.isLatex)
+                );
+                if (isTitle) return 5;
+
+                // Layer 2: LaTeX/Formula blocks and their backgrounds
+                const isLatex = el.is_latex || el.isLatex || id.includes('latex') || id.includes('formula');
+                const isFormulaBg = id.includes('_bg') && (id.includes('text') || id.includes('latex') || id.includes('formula') || id.includes('element_102')); // e.g. slide_c1050e194a62_element_1021_text_bg
+                if (isLatex || isFormulaBg) return 2;
+
+                // Layer 0 (Bottom): Background Grid / Frame
+                const isGrid = id.includes('grid') || stroke === '#eeeeee' || stroke === '#dddddd' || el.dasharray === '3,3' || el.dasharray === '4,4';
+                const isFrame = id.includes('frame') || id.includes('border') || (type === 'rect' && id.includes('grid'));
+                if (isGrid || isFrame) return 0;
+
+                // Layer 3: Axes / Ticks
+                const isAxis = id.includes('axes') || id.includes('axis') || type === 'arrow' || type === 'double_arrow';
+                const isTick = id.includes('tick') || (type === 'line' && stroke === '#000000' && ((el.stroke_width !== undefined ? el.stroke_width : el.strokeWidth) === 1.5));
+                if (isAxis || isTick) return 3;
+
+                // Layer 4: Labels / Numbers / Point Labels (Non-title text elements)
+                if (type === 'text') return 4;
+
+                // Layer 1: Plotted lines/curves/hatches/points/markers (falling through default)
+                return 1;
+            }
+
+            // Clone and sort elements array safely (filtering out null/undefined)
+            const validElements = elements.filter(el => el !== null && el !== undefined);
+            const sortedElements = [...validElements].sort((a, b) => getElementZIndex(a) - getElementZIndex(b));
+
+            const resolved = [];
+            const unresolved = [];
+            const autotext_content = {};
+
+            sortedElements.forEach((el, index) => {
+                const elType = el.type;
+                const objectId = el.id || el.objectId || `element_${index}_${elType}`;
+
+                if (elType === 'rect') {
+                    const fill = el.fill || "none";
+                    const stroke = el.stroke || "#000000";
+                    const rawStrokeWidth = el.stroke_width !== undefined ? el.stroke_width : el.strokeWidth;
+                    const stroke_width = rawStrokeWidth !== undefined ? rawStrokeWidth : 2.0;
+
+                    // Dimensions and coordinates scaled to standard GWT units (Points * 508)
+                    const x_cp = Math.round((el.x || 0) * 508);
+                    const y_cp = Math.round((el.y || 0) * 508);
+                    const w_cp = Math.round((el.width || 100) * 508);
+                    const h_cp = Math.round((el.height || 100) * 508);
+
+                    // Transform matrix: default shape is 10000 GWT units (approx 78.74 PT)
+                    let scaleX = w_cp / 10000;
+                    let scaleY = h_cp / 10000;
+                    if (scaleX === 0) scaleX = 0.0001;
+                    if (scaleY === 0) scaleY = 0.0001;
+
+                    // Build styling properties array
+                    const fill_upper = fill.toUpperCase();
+                    const stroke_upper = stroke.toUpperCase();
+                    const is_filled = fill !== 'none' ? 1 : 0;
+                    const style = [14, is_filled];
+                    if (fill !== 'none') {
+                        style.push(15, fill_upper);
+                    } else {
+                        style.push(15, "none");
+                    }
+                    if (stroke !== 'none') {
+                        style.push(19, stroke_upper, 22, Math.round(stroke_width * 508));
+                    } else {
+                        style.push(19, "none");
+                    }
+
+                    // Create the operation array
+                    const op = [3, objectId, 6, [scaleX, 0, 0, scaleY, x_cp, y_cp], style, "p"];
+                    resolved.push(op);
+                    unresolved.push(op);
+
+                } else if (elType === 'ellipse' || elType === 'circle') {
+                    const fill = el.fill || "none";
+                    const stroke = el.stroke || "#000000";
+                    const rawStrokeWidth = el.stroke_width !== undefined ? el.stroke_width : el.strokeWidth;
+                    const stroke_width = rawStrokeWidth !== undefined ? rawStrokeWidth : 2.0;
+
+                    const x_cp = Math.round((el.x || 0) * 508);
+                    const y_cp = Math.round((el.y || 0) * 508);
+                    const w_cp = Math.round((el.width || 100) * 508);
+                    const h_cp = Math.round((el.height || 100) * 508);
+
+                    let scaleX = w_cp / 120000; // Ellipse default GWT bounding box is 120000 GWT units
+                    let scaleY = h_cp / 120000;
+                    if (scaleX === 0) scaleX = 0.0001;
+                    if (scaleY === 0) scaleY = 0.0001;
+
+                    const fill_upper = fill.toUpperCase();
+                    const stroke_upper = stroke.toUpperCase();
+                    const is_filled = fill !== 'none' ? 1 : 0;
+                    const style = [14, is_filled];
+                    if (fill !== 'none') {
+                        style.push(15, fill_upper);
+                    } else {
+                        style.push(15, "none");
+                    }
+                    if (stroke !== 'none') {
+                        style.push(19, stroke_upper, 22, Math.round(stroke_width * 508));
+                    } else {
+                        style.push(19, "none");
+                    }
+
+                    // Shape type 8 is Ellipse
+                    const op = [3, objectId, 8, [scaleX, 0, 0, scaleY, x_cp, y_cp], style, "p"];
+                    resolved.push(op);
+                    unresolved.push(op);
+
+                } else if (elType === 'line' || elType === 'arrow' || elType === 'double_arrow') {
+                    const x1 = el.x1 || 0;
+                    const y1 = el.y1 || 0;
+                    const x2 = el.x2 || 0;
+                    const y2 = el.y2 || 0;
+                    const stroke = el.stroke || "#000000";
+                    const rawStrokeWidth = el.stroke_width !== undefined ? el.stroke_width : el.strokeWidth;
+                    const stroke_width = rawStrokeWidth !== undefined ? rawStrokeWidth : 2.0;
+
+                    const dx = x2 - x1;
+                    const dy = y2 - y1;
+
+                    // Scale factors relative to default GWT connector bounds (120,000 centipoints)
+                    let scaleX = (dx * 508) / 120000;
+                    let scaleY = (dy * 508) / 120000;
+                    if (scaleX === 0) scaleX = 0.0001;
+                    if (scaleY === 0) scaleY = 0.0001;
+
+                    const x_cp = Math.round(x1 * 508);
+                    const y_cp = Math.round(y1 * 508);
+
+                    const stroke_upper = stroke.toUpperCase();
+                    const stroke_width_cp = Math.round(stroke_width * 508);
+                    const hasDash = el.dasharray && el.dasharray !== 'none';
+
+                    // High robustness styles for connector lines in Google Slides (key 15 cannot be "none")
+                    const style = [
+                        14, 0,
+                        15, "#EEEEEE",
+                        18, 1,
+                        19, stroke_upper,
+                        22, stroke_width_cp,
+                        27, 1.3,
+                        30, 1.3,
+                        43, hasDash ? 2 : 0
+                    ];
+
+                    if (elType === 'arrow') {
+                        // End arrowhead is key 29, value 5 (Stealth arrowhead)
+                        style.push(29, 5);
+                    } else if (elType === 'double_arrow') {
+                        // Start arrowhead is 28, End arrowhead is 29, both value 5
+                        style.push(28, 5, 29, 5);
+                    }
+
+                    // Shape type 153 is straight connector
+                    const op = [3, objectId, 153, [scaleX, 0, 0, scaleY, x_cp, y_cp], style, "p"];
+                    resolved.push(op);
+                    unresolved.push(op);
+
+                } else if (elType === 'text') {
+                    const textStr = el.text !== undefined && el.text !== null ? String(el.text) : "";
+                    const color = el.color || "#000000";
+                    const align = el.align || "start";
+
+                    const box_w = el.width !== undefined ? el.width : 400; // use uploader's default width of 400 pt for position mapping
+                    const box_h = el.height !== undefined ? el.height : (el.font_size ? el.font_size * 2.5 : 40);
+
+                    let tx = el.x || 0;
+                    if (align === 'center' || align === 'middle') {
+                        tx = tx - (box_w / 2.0);
+                    } else if (align === 'right' || align === 'end') {
+                        tx = tx - box_w;
+                    }
+                    const ty = (el.y || 0) - (box_h / 2.0);
+
+                    // Real width and height used for GWT shape scale factors
+                    let real_w = el.width !== undefined ? el.width : 333.33; // default text box shape size in GSlides is 333.33 PT
+                    let real_h = el.height !== undefined ? el.height : 37.5; // default text box shape size in GSlides is 37.5 PT
+
+                    const x_cp = Math.round(tx * 508);
+                    const y_cp = Math.round(ty * 508);
+                    const w_cp = Math.round(real_w * 508);
+                    const h_cp = Math.round(real_h * 508);
+
+                    let scaleX = w_cp / 100000; // default GWT text box internal bounding box is 100,000 units wide
+                    let scaleY = h_cp / 100000;
+                    if (scaleX === 0) scaleX = 0.0001;
+                    if (scaleY === 0) scaleY = 0.0001;
+
+                    // Textbox is shape type 108 with [44, 0] styles
+                    const style = [44, 0];
+                    const op = [3, objectId, 108, [scaleX, 0, 0, scaleY, x_cp, y_cp], style, "p"];
+                    resolved.push(op);
+                    unresolved.push(op);
+
+                    // Insert text operation
+                    if (textStr) {
+                        const N = textStr.length;
+                        
+                        // Op 15: Raw character insertion
+                        const textOp = [15, objectId, null, 0, textStr];
+                        resolved.push(textOp);
+                        unresolved.push(textOp);
+
+                        // Op 17 (Alignment): [17, shapeId, null, N, N + 1, [], [12, ALIGN_VAL]]
+                        let alignVal = 1; // Left/start
+                        if (align === 'center' || align === 'middle') {
+                            alignVal = 2;
+                        } else if (align === 'right' || align === 'end') {
+                            alignVal = 3;
+                        }
+                        const alignOp = [17, objectId, null, N, N + 1, [], [12, alignVal]];
+                        resolved.push(alignOp);
+                        unresolved.push(alignOp);
+
+                        // Op 17 (Typography): [17, shapeId, null, 0, N + 1, [], [typographyProps]]
+                        const typographyProps = [];
+                        if (el.bold) {
+                            typographyProps.push(0, 1);
+                        }
+                        if (el.italic) {
+                            typographyProps.push(1, 1);
+                        }
+                        if (color && color !== 'none') {
+                            typographyProps.push(4, color.toUpperCase());
+                        }
+                        typographyProps.push(5, fontFamily || el.fontFamily || "Ubuntu");
+                        const rawFontSize = el.font_size !== undefined ? el.font_size : el.fontSize;
+                        const fontSize = rawFontSize !== undefined ? Math.round(rawFontSize) : 16;
+                        typographyProps.push(6, fontSize);
+
+                        const typographyOp = [17, objectId, null, 0, N + 1, [], typographyProps];
+                        resolved.push(typographyOp);
+                        unresolved.push(typographyOp);
+
+                        // High fidelity autotext envelope
+                        autotext_content[JSON.stringify({ shapeId: objectId })] = {};
+                    }
+
+                } else if (elType === 'group') {
+                    // Op Code 2: Logical Grouping of elements
+                    const children = el.childrenObjectIds || [];
+                    const op = [2, objectId, children, [1, 0, 0, 1, 0, 0], "p"];
+                    resolved.push(op);
+                    unresolved.push(op);
+                }
+            });
+
+            const flatPayload = JSON.stringify({
+                resolved: resolved,
+                unresolved: unresolved,
+                autotext_content: autotext_content,
+                did_remove_empty_picture_placeholders: false,
+                copy_source_supports_inheritance_via_master: true
+            });
+
+            const wrappedPayload = JSON.stringify({
+                dih: 1245482604,
+                data: flatPayload,
+                edi: "kBeECgZrwyN4Pk3CGalAkiIcibCHBxM0-dGHUMnfHDgyvkMYVZ_pxB9fogazgDhzNcbMktVjXdXLwpNCRHaU0vvKDDCQIvYzhuttxtQqAThS",
+                edrk: "We7cOKI5bHNbFvbICo1cgW8xvwoMCQ_DEW3hRvkC3-q7k9z-tw..",
+                dct: "punch",
+                ds: false,
+                cses: false,
+                sm: "other"
+            });
+
+            return {
+                flat: flatPayload,
+                wrapped: wrappedPayload
+            };
+        }
 
         createApp({
             compilerOptions: {
@@ -1315,18 +1642,18 @@
 
                         // Side ticks & Labels
                         config.textLabels.push(
-                            { text: 'u', x: 20, y: 25, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
-                            { text: ' (m)', x: 26, y: 25, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false },
-                            { text: 't', x: 652, y: 385, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, maskBg: false },
-                            { text: ' (s)', x: 658, y: 385, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false }
+                            { text: 'u', x: 20, y: 25, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, italic: true, maskBg: false, width: 12, height: 30 },
+                            { text: ' (m)', x: 26, y: 25, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false, width: 50, height: 30 },
+                            { text: 't', x: 652, y: 385, coordinateMode: 'screen', fontSize: 18, color: '#000000', align: 'right', isLatex: false, bold: true, italic: true, maskBg: false, width: 12, height: 30 },
+                            { text: ' (s)', x: 658, y: 385, coordinateMode: 'screen', fontSize: 16, color: '#000000', align: 'left', isLatex: false, bold: false, maskBg: false, width: 50, height: 30 }
                         );
 
-                        // LaTeX coordinates tags
+                        // Coordinates tags (standard text boxes with masking)
                         config.textLabels.push(
-                            { text: '(2{,}6; 0{,}2)', x: 2.6, y: 0.22, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'center', isLatex: true, bold: true, maskBg: true },
-                            { text: '(3{,}4; -0{,}2)', x: 3.3, y: -0.20, coordinateMode: 'math', fontSize: 14, color: '#980000', align: 'right', isLatex: true, bold: true, maskBg: true },
-                            { text: '(4{,}4; 0{,}2)', x: 4.4, y: 0.22, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'center', isLatex: true, bold: true, maskBg: true },
-                            { text: '(3{,}6; -0{,}2)', x: 3.7, y: -0.20, coordinateMode: 'math', fontSize: 14, color: '#38761d', align: 'left', isLatex: true, bold: true, maskBg: true }
+                            { text: '(2,6; 0,2)', x: 2.6, y: 0.22, coordinateMode: 'math', fontSize: 16, color: '#980000', align: 'center', isLatex: false, bold: true, maskBg: true, width: 95, height: 28 },
+                            { text: '(3,4; -0,2)', x: 3.3, y: -0.20, coordinateMode: 'math', fontSize: 16, color: '#980000', align: 'right', isLatex: false, bold: true, maskBg: true, width: 115, height: 28 },
+                            { text: '(4,4; 0,2)', x: 4.4, y: 0.22, coordinateMode: 'math', fontSize: 16, color: '#38761d', align: 'center', isLatex: false, bold: true, maskBg: true, width: 95, height: 28 },
+                            { text: '(3,6; -0,2)', x: 3.7, y: -0.20, coordinateMode: 'math', fontSize: 16, color: '#38761d', align: 'left', isLatex: false, bold: true, maskBg: true, width: 115, height: 28 }
                         );
 
                     } else if (selectedPreset.value === 'area') {
@@ -1963,7 +2290,7 @@
                             drawTextLabel(ctx, lbl, slideElements, katexLayer, cv);
                         });
                         
-                        this.slideData = {
+                        slideData.value = {
                             width: width,
                             height: height,
                             font_family: config.fontFamily,
@@ -1993,7 +2320,6 @@
                     const pyMax = viewport.marginTop;             // top edge
 
                     const axesElements = [];
-                    const gridElements = [];
                     const doXBreak = config.grid.xBreak || (config.grid.xBreak !== false && (viewport.xMin > 0.1 || viewport.xMax < -0.1));
                     const doYBreak = config.grid.yBreak || (config.grid.yBreak !== false && (viewport.yMin > 0.1 || viewport.yMax < -0.1));
 
@@ -2014,7 +2340,7 @@
                                 ctx.lineTo(px, pyMin);
                                 ctx.stroke();
                                 
-                                gridElements.push({
+                                axesElements.push({
                                     type: "line", x1: px, y1: pyMax, x2: px, y2: pyMin,
                                     stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
                                 });
@@ -2033,28 +2359,12 @@
                                 ctx.lineTo(pxMax, py);
                                 ctx.stroke();
                                 
-                                gridElements.push({
+                                axesElements.push({
                                     type: "line", x1: pxMin, y1: py, x2: pxMax, y2: py,
                                     stroke: '#dddddd', stroke_width: 1.0, dasharray: "4,4"
                                 });
                             }
                         }
-                    }
-
-                    if (gridElements.length > 0) {
-                        const childIds = [];
-                        const gridTimeId = Math.random().toString(36).substr(2, 4);
-                        gridElements.forEach((el, index) => {
-                            const cid = `grid_c_${gridTimeId}_${index}`;
-                            el.id = cid;
-                            slideElements.push(el);
-                            childIds.push(cid);
-                        });
-                        slideElements.push({
-                            type: "group",
-                            id: `g_grid_${gridTimeId}`,
-                            childrenObjectIds: childIds
-                        });
                     }
 
                     // Ticks/Labels axes positions
@@ -2314,14 +2624,15 @@
                             let tRounded = parseFloat(t.toFixed(4));
                             let lbl = tRounded.toString();
                             if (config.grid.dutchComma) {
-                                lbl = lbl.replace('.', ',');
+                                  lbl = lbl.replace('.', ',');
                             }
                             ctx.fillText(lbl, px, pyAxisLabel + 15);
                             
+                            // Align x and width to match the reference GSlides API constraint exactly
                             slideElements.push({
-                                type: "text", x: px, y: pyAxisLabel + 20, text: lbl,
+                                type: "text", x: px - 33.33, y: pyAxisLabel + 20, text: lbl,
                                 font_size: 16, color: '#000000', align: 'center',
-                                width: 60, height: 24
+                                width: 333.33, height: 37.5
                             });
                         }
                     }
@@ -2341,10 +2652,11 @@
                             }
                             ctx.fillText(lbl, pxAxisLabel - 15, py);
                             
+                            // Align x and width to match the reference GSlides API constraint exactly
                             slideElements.push({
-                                type: "text", x: pxAxisLabel - 15, y: py, text: lbl,
+                                type: "text", x: pxAxisLabel - 15 - 66.67, y: py, text: lbl,
                                 font_size: 16, color: '#000000', align: 'right',
-                                width: 60, height: 24
+                                width: 333.33, height: 37.5
                             });
                         }
                     }
@@ -2410,18 +2722,11 @@
                             }
 
                             if (standardCurveLines.length > 0) {
-                                const childIds = [];
                                 const curveTimeId = Math.random().toString(36).substr(2, 4);
                                 standardCurveLines.forEach((el, elIdx) => {
-                                    const cid = `cs_${curveTimeId}_${elIdx}`;
+                                    const cid = `curve_segment_${curveTimeId}_${elIdx}`;
                                     el.id = cid;
                                     slideElements.push(el);
-                                    childIds.push(cid);
-                                });
-                                slideElements.push({
-                                    type: "group",
-                                    id: `gc_${curveTimeId}`,
-                                    childrenObjectIds: childIds
                                 });
                             }
                         } else {
@@ -2470,18 +2775,11 @@
                             }
 
                             if (parametricCurveLines.length > 0) {
-                                const childIds = [];
                                 const curveTimeId = Math.random().toString(36).substr(2, 4);
                                 parametricCurveLines.forEach((el, elIdx) => {
-                                    const cid = `ps_${curveTimeId}_${elIdx}`;
+                                    const cid = `curve_segment_${curveTimeId}_${elIdx}`;
                                     el.id = cid;
                                     slideElements.push(el);
-                                    childIds.push(cid);
-                                });
-                                slideElements.push({
-                                    type: "group",
-                                    id: `gp_${curveTimeId}`,
-                                    childrenObjectIds: childIds
                                 });
                             }
                         }
@@ -2612,7 +2910,7 @@
                             drawArrowHead(ctx, px2, py2, px1, py1, ln.stroke, 10);
                             
                             slideElements.push({
-                                type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                                type: "double_arrow", x1: px1, y1: py1, x2: px2, y2: py2,
                                 stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
                             });
                         } else {
@@ -2733,7 +3031,7 @@
                     });
 
                     // Update compiled slides data
-                    this.slideData = {
+                    slideData.value = {
                         width: width,
                         height: height,
                         font_family: config.fontFamily,
@@ -2807,9 +3105,12 @@
                         font_size: lbl.fontSize,
                         color: lbl.color,
                         bold: lbl.bold,
+                        italic: lbl.italic,
                         align: lbl.align,
                         mask_bg: lbl.maskBg,
-                        is_latex: lbl.isLatex
+                        is_latex: lbl.isLatex,
+                        width: lbl.width,
+                        height: lbl.height
                     });
                 };
 
@@ -2985,7 +3286,7 @@
                         drawArrowHead(ctx, px2, py2, px1, py1, ln.stroke, 10);
                         
                         slideElements.push({
-                            type: "line", x1: px1, y1: py1, x2: px2, y2: py2,
+                            type: "double_arrow", x1: px1, y1: py1, x2: px2, y2: py2,
                             stroke: ln.stroke, stroke_width: ln.strokeWidth, dasharray: ln.dasharray
                         });
                     } else {
@@ -3173,7 +3474,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                slide_data: this.slideData,
+                                slide_data: slideData.value,
                                 folder_id: selectedFolder.value
                             })
                         });
@@ -3208,7 +3509,7 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 presentation_id: uploadedPresentationId.value,
-                                slide_data: this.slideData
+                                slide_data: slideData.value
                             })
                         });
                         const res = await response.json();
@@ -3236,7 +3537,7 @@
                 const downloadSVG = () => {
                     const svgWidth = config.canvasWidth;
                     const svgHeight = config.canvasHeight;
-                    const elements = this.slideData.elements;
+                    const elements = slideData.value ? slideData.value.elements : [];
                     
                     let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">\n`;
                     svgContent += `<rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />\n`;
@@ -3269,6 +3570,229 @@
                     URL.revokeObjectURL(url);
                 };
 
+                const copyToGoogleSlides = () => {
+                    let customSlidesPayload;
+                    try {
+                        const fontFamily = config.fontFamily || 'Ubuntu';
+                        const currentSlideData = slideData.value;
+                        const elements = currentSlideData ? currentSlideData.elements : [];
+                        if (!elements || elements.length === 0) {
+                            status.type = 'error';
+                            status.message = 'No elements available to copy. Please draw or generate a graph first.';
+                            return;
+                        }
+                        customSlidesPayload = convertToGoogleSlidesJSON(elements, fontFamily);
+                        console.log('Synthesized Google Slides Clipboard Payload:', customSlidesPayload);
+                    } catch (err) {
+                        status.type = 'error';
+                        status.message = `Failed to build slide payload: ${err.message}`;
+                        console.error('Payload generation failed:', err);
+                        return;
+                    }
+
+                    const transactionId = '2519a9aa-7fff-ab00-1255-' + Math.random().toString(16).substr(2, 12);
+
+                    // First, try writing to the OS clipboard using the local Python ctypes backend!
+                    fetch('/api/write_clipboard', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            wrapped: customSlidesPayload.wrapped,
+                            flat: customSlidesPayload.flat,
+                            clip_id: transactionId,
+                            fallback_text: '[Google Slides Graph Data]'
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            status.type = 'success';
+                            status.message = 'Graph copied to clipboard via local python backend! Go to Google Slides and press Ctrl+V to paste.';
+                            status.url = '';
+                        } else {
+                            console.warn('Local Python clipboard backend failed, falling back to browser copy:', data.error);
+                            executeBrowserCopy();
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Local Python clipboard backend error, falling back to browser copy:', err);
+                        executeBrowserCopy();
+                    });
+
+                    function executeBrowserCopy() {
+                        const interceptCopy = (event) => {
+                            event.preventDefault();
+                            const objWrapped = 'application/x-vnd.google-docs-drawings-object+wrapped';
+                            const clipIdMime = 'application/x-vnd.google-docs-internal-clip-id';
+
+                            try {
+                                event.clipboardData.setData(objWrapped, customSlidesPayload.wrapped);
+                                event.clipboardData.setData(clipIdMime, transactionId);
+                                event.clipboardData.setData('text/plain', '[Google Slides Graph Data]');
+                                event.clipboardData.setData('text/html', '<b>Google Slides Graph Data</b>');
+                                console.log('Successfully set drawings object wrapped payload with transaction ID on clipboard event!');
+                            } catch (e) {
+                                console.error('Failed to set clipboard data:', e);
+                            }
+
+                            document.removeEventListener('copy', interceptCopy);
+                        };
+
+                        // Create temporary invisible selection to ensure execCommand works in Chromium
+                        const activeEl = document.activeElement;
+                        const tempTextarea = document.createElement('textarea');
+                        tempTextarea.style.position = 'fixed';
+                        tempTextarea.style.left = '-9999px';
+                        tempTextarea.style.top = '-9999px';
+                        tempTextarea.style.opacity = '0';
+                        tempTextarea.style.pointerEvents = 'none';
+                        tempTextarea.value = ' ';
+                        document.body.appendChild(tempTextarea);
+                        tempTextarea.select();
+                        tempTextarea.setSelectionRange(0, 1);
+
+                        document.addEventListener('copy', interceptCopy);
+
+                        try {
+                            const success = document.execCommand('copy');
+                            if (success) {
+                                status.type = 'success';
+                                status.message = 'Graph copied to clipboard as Google Slides shapes! Go to Google Slides and press Ctrl+V to paste.';
+                                status.url = '';
+                            } else {
+                                status.type = 'error';
+                                status.message = 'Browser rejected the copy command execution.';
+                            }
+                        } catch (err) {
+                            status.type = 'error';
+                            status.message = `Copy failed: ${err.message}`;
+                        } finally {
+                            document.removeEventListener('copy', interceptCopy);
+                            document.body.removeChild(tempTextarea);
+                            if (activeEl) {
+                                activeEl.focus();
+                            }
+                        }
+                    }
+                };
+
+                const copyTestShape = () => {
+                    // Match the working python payload from write_test_clipboard_v2.py exactly
+                    const resolved_array = [
+                        [3, "my_custom_rect_01", 6, [1.5, 0, 0, 1.0, 15000, 15000], [14, 0, 15, "#cfe2f3", 19, "#0b5394", 22, 200], "p"]
+                    ];
+
+                    const inner_payload = {
+                        resolved: resolved_array,
+                        unresolved: resolved_array,
+                        autotext_content: {},
+                        did_remove_empty_picture_placeholders: false,
+                        copy_source_supports_inheritance_via_master: true
+                    };
+
+                    const flatPayload = JSON.stringify(inner_payload);
+
+                    const wrappedPayload = {
+                        dih: 1245482604,
+                        data: flatPayload,
+                        edi: "kBeECgZrwyN4Pk3CGalAkiIcibCHBxM0-dGHUMnfHDgyvkMYVZ_pxB9fogazgDhzNcbMktVjXdXLwpNCRHaU0vvKDDCQIvYzhuttxtQqAThS",
+                        edrk: "We7cOKI5bHNbFvbICo1cgW8xvwoMCQ_DEW3hRvkC3-q7k9z-tw..",
+                        dct: "punch",
+                        ds: false,
+                        cses: false,
+                        sm: "other"
+                    };
+
+                    const wrapped_str = JSON.stringify(wrappedPayload);
+                    const clipId = "2519a9aa-7fff-ab00-1255-47f90648ed96";
+
+                    // First, write locally using the Python backend clipboard API for 100% success!
+                    fetch('/api/write_clipboard', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            wrapped: wrapped_str,
+                            flat: flatPayload,
+                            clip_id: clipId,
+                            fallback_text: '[Google Slides Rect]'
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            status.type = 'success';
+                            status.message = 'Test rectangle copied to clipboard via local python backend! Try pasting (Ctrl+V) in Google Slides.';
+                            status.url = '';
+                        } else {
+                            console.warn('Local Python clipboard backend failed, falling back to browser copy:', data.error);
+                            executeBrowserCopy();
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Local Python clipboard backend error, falling back to browser copy:', err);
+                        executeBrowserCopy();
+                    });
+
+                    function executeBrowserCopy() {
+                        const interceptCopy = (event) => {
+                            event.preventDefault();
+                            const objWrapped = 'application/x-vnd.google-docs-drawings-object+wrapped';
+                            const clipIdMime = 'application/x-vnd.google-docs-internal-clip-id';
+
+                            try {
+                                event.clipboardData.setData(objWrapped, wrapped_str);
+                                event.clipboardData.setData(clipIdMime, clipId);
+                                event.clipboardData.setData('text/plain', '[Google Slides Rect]');
+                                event.clipboardData.setData('text/html', '<b>Google Slides Rect</b>');
+                                console.log('Successfully set test drawings object wrapped payload with transaction ID on clipboard event!');
+                            } catch (e) {
+                                console.error('Failed to set clipboard data:', e);
+                            }
+                            document.removeEventListener('copy', interceptCopy);
+                        };
+
+                        // Create temporary invisible selection to ensure execCommand works in Chromium
+                        const activeEl = document.activeElement;
+                        const tempTextarea = document.createElement('textarea');
+                        tempTextarea.style.position = 'fixed';
+                        tempTextarea.style.left = '-9999px';
+                        tempTextarea.style.top = '-9999px';
+                        tempTextarea.style.opacity = '0';
+                        tempTextarea.style.pointerEvents = 'none';
+                        tempTextarea.value = ' ';
+                        document.body.appendChild(tempTextarea);
+                        tempTextarea.select();
+                        tempTextarea.setSelectionRange(0, 1);
+
+                        document.addEventListener('copy', interceptCopy);
+
+                        try {
+                            const success = document.execCommand('copy');
+                            if (success) {
+                                status.type = 'success';
+                                status.message = 'Test rectangle copied to clipboard! Try pasting (Ctrl+V) in Google Slides.';
+                                status.url = '';
+                            } else {
+                                status.type = 'error';
+                                status.message = 'Browser rejected the copy command execution.';
+                            }
+                        } catch (err) {
+                            status.type = 'error';
+                            status.message = `Copy failed: ${err.message}`;
+                        } finally {
+                            document.removeEventListener('copy', interceptCopy);
+                            document.body.removeChild(tempTextarea);
+                            if (activeEl) {
+                                activeEl.focus();
+                            }
+                        }
+                    }
+                };
+
                 // Watchers for config changes to automatically redraw canvas
                 watch(config, () => {
                     drawLivePreview();
@@ -3277,6 +3801,115 @@
                 onMounted(() => {
                     loadPreset();
                     checkAuthStatus();
+
+                    // Global paste event listener for debugging Google Slides payloads
+                    document.addEventListener('paste', (event) => {
+                        const targetMimeType = event.clipboardData.types.includes('application/x-vnd.google-docs-drawings-object+wrapped') ? 
+                            'application/x-vnd.google-docs-drawings-object+wrapped' : 
+                            'application/x-vnd.google-docs-drawings-page+wrapped';
+                            
+                        if (event.clipboardData.types.includes(targetMimeType)) {
+                            const rawPayload = event.clipboardData.getData(targetMimeType);
+                            console.log('--- Intercepted Google Slides Payload ---');
+                            console.log(rawPayload);
+                            try {
+                                const parsedJson = JSON.parse(rawPayload);
+                                console.dir(parsedJson);
+                                status.type = 'success';
+                                status.message = `Captured Google Slides clipboard payload! Check browser console (F12) for full JSON.`;
+                            } catch (e) {
+                                console.error('Failed to parse payload as valid JSON:', e);
+                                status.type = 'error';
+                                status.message = `Captured clipboard payload, but failed to parse as JSON. See console.`;
+                            }
+                        }
+                    });
+
+                    // Set up local clipboard diagnostic box event handlers
+                    setTimeout(() => {
+                        const pasteArea = document.getElementById('paste-diagnostic-area');
+                        if (pasteArea) {
+                            pasteArea.addEventListener('paste', (event) => {
+                                event.preventDefault();
+                                const types = event.clipboardData.types;
+                                console.log('Paste event captured on diagnostic box. Available types:', types);
+                                
+                                let capturedMime = 'None';
+                                let payload = '';
+                                
+                                const objWrapped = 'application/x-vnd.google-docs-drawings-object+wrapped';
+                                const objFlat = 'application/x-vnd.google-docs-drawings-object';
+                                const pageWrapped = 'application/x-vnd.google-docs-drawings-page+wrapped';
+                                const pageFlat = 'application/x-vnd.google-docs-drawings-page';
+                                
+                                if (types.includes(objWrapped)) {
+                                    capturedMime = objWrapped;
+                                    payload = event.clipboardData.getData(objWrapped);
+                                } else if (types.includes(objFlat)) {
+                                    capturedMime = objFlat;
+                                    payload = event.clipboardData.getData(objFlat);
+                                } else if (types.includes(pageWrapped)) {
+                                    capturedMime = pageWrapped;
+                                    payload = event.clipboardData.getData(pageWrapped);
+                                } else if (types.includes(pageFlat)) {
+                                    capturedMime = pageFlat;
+                                    payload = event.clipboardData.getData(pageFlat);
+                                } else {
+                                    capturedMime = types.join(', ');
+                                    payload = "No Google Slides drawing data found in this paste event.\n" + 
+                                              "Available clipboard MIME types are:\n" + 
+                                              types.map(t => ` - ${t}`).join('\n') + 
+                                              "\n\nIf you copied a shape, please ensure you copied it natively from Google Slides/Drawings.";
+                                }
+                                
+                                const mimeIndicator = document.getElementById('paste-mime-type');
+                                if (mimeIndicator) mimeIndicator.innerText = capturedMime;
+                                
+                                // Attempt to parse, structure, and pretty-print JSON payload
+                                try {
+                                    const parsed = JSON.parse(payload);
+                                    if (parsed.data) {
+                                        // It's wrapped! Let's parse the inner JSON too for ultimate readability
+                                        try {
+                                            const inner = JSON.parse(parsed.data);
+                                            pasteArea.value = JSON.stringify({
+                                                "--- CLIPBOARD TYPE ---": "DOUBLE-SERIALIZED ENVELOPE (application/x-vnd.google-docs-drawings-page+wrapped)",
+                                                "dih": parsed.dih,
+                                                "data_decoded_json": inner
+                                            }, null, 2);
+                                        } catch (innerErr) {
+                                            pasteArea.value = JSON.stringify(parsed, null, 2);
+                                        }
+                                    } else {
+                                        pasteArea.value = JSON.stringify({
+                                            "--- CLIPBOARD TYPE ---": "FLAT DRAWINGS PAYLOAD (application/x-vnd.google-docs-drawings-page)",
+                                            ...parsed
+                                        }, null, 2);
+                                    }
+                                } catch (e) {
+                                    pasteArea.value = payload;
+                                }
+                                
+                                status.type = 'success';
+                                status.message = "Successfully captured Google Slides shape payload! Click 'Copy Diagnostic Log' below.";
+                            });
+                        }
+                        
+                        const copyBtn = document.getElementById('copy-log-btn');
+                        if (copyBtn) {
+                            copyBtn.addEventListener('click', () => {
+                                const pasteArea = document.getElementById('paste-diagnostic-area');
+                                if (pasteArea && pasteArea.value) {
+                                    navigator.clipboard.writeText(pasteArea.value);
+                                    status.type = 'success';
+                                    status.message = "Diagnostics log copied to clipboard! Paste it into our chat.";
+                                } else {
+                                    status.type = 'error';
+                                    status.message = "Nothing to copy yet. Please copy a shape from Google Slides and paste it in the box first!";
+                                }
+                            });
+                        }
+                    }, 500);
                 });
 
                 return {
@@ -3314,6 +3947,8 @@
                     appendSlideToPresentation,
                     copyId,
                     downloadSVG,
+                    copyToGoogleSlides,
+                    copyTestShape,
                     slideData,
                     
                     // Chat integration
