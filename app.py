@@ -235,6 +235,317 @@ def list_folders():
         logger.error(f"Error listing folders: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+def convert_to_google_slides_json(elements, font_family='Ubuntu'):
+    if not elements:
+        return {
+            "flat": json.dumps({"resolved": [], "unresolved": []}),
+            "wrapped": json.dumps({"dih": 1245482604, "data": "{}"})
+        }
+
+    def get_element_z_index(el):
+        if not el:
+            return 1
+        el_type = el.get('type', '')
+        obj_id = str(el.get('id', '') or el.get('objectId', '')).lower()
+        stroke = str(el.get('stroke', '')).lower()
+        text = str(el.get('text', '') or '')
+
+        # Layer 5 (Top): Graph Title
+        is_title = el_type == 'text' and (
+            'title' in obj_id or
+            'lorenz' in text or 'lissajous' in text or 'overzicht' in text or
+            (float(el.get('font_size', el.get('fontSize', 16)) or 16) >= 18 and el.get('bold') and not el.get('is_latex') and not el.get('isLatex'))
+        )
+        if is_title:
+            return 5
+
+        # Layer 2: LaTeX/Formula blocks and their backgrounds
+        is_latex = el.get('is_latex') or el.get('isLatex') or 'latex' in obj_id or 'formula' in obj_id
+        is_formula_bg = '_bg' in obj_id and ('text' in obj_id or 'latex' in obj_id or 'formula' in obj_id or 'element_102' in obj_id)
+        if is_latex or is_formula_bg:
+            return 2
+
+        # Layer 0 (Bottom): Background Grid / Frame
+        is_grid = 'grid' in obj_id or stroke == '#eeeeee' or stroke == '#dddddd' or el.get('dasharray') == '3,3' or el.get('dasharray') == '4,4'
+        is_frame = 'frame' in obj_id or 'border' in obj_id or (el_type == 'rect' and 'grid' in obj_id)
+        if is_grid or is_frame:
+            return 0
+
+        # Layer 3: Axes / Ticks
+        is_axis = 'axes' in obj_id or 'axis' in obj_id or el_type in ('arrow', 'double_arrow')
+        is_tick = 'tick' in obj_id or (el_type == 'line' and stroke == '#000000' and float(el.get('stroke_width', el.get('strokeWidth', 2.0)) or 2.0) == 1.5)
+        if is_axis or is_tick:
+            return 3
+
+        # Layer 4: Labels / Numbers / Point Labels (Non-title text elements)
+        if el_type == 'text':
+            return 4
+
+        # Layer 1: Plotted lines/curves/hatches/points/markers (falling through default)
+        return 1
+
+    valid_elements = [el for el in elements if el is not None]
+    sorted_elements = sorted(valid_elements, key=get_element_z_index)
+
+    resolved = []
+    unresolved = []
+    autotext_content = {}
+
+    for index, el in enumerate(sorted_elements):
+        el_type = el.get('type')
+        obj_id = el.get('id') or el.get('objectId') or f"element_{index}_{el_type}"
+
+        if el_type == 'rect':
+            fill = el.get('fill', 'none') or 'none'
+            stroke = el.get('stroke', '#000000') or 'none'
+            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
+            if stroke_width is None:
+                stroke_width = 2.0
+            else:
+                stroke_width = float(stroke_width)
+
+            x_cp = int(round(float(el.get('x', 0) or 0) * 508))
+            y_cp = int(round(float(el.get('y', 0) or 0) * 508))
+            w_cp = int(round(float(el.get('width', 100) or 100) * 508))
+            h_cp = int(round(float(el.get('height', 100) or 100) * 508))
+
+            scale_x = w_cp / 10000.0
+            scale_y = h_cp / 10000.0
+            if scale_x == 0:
+                scale_x = 0.0001
+            if scale_y == 0:
+                scale_y = 0.0001
+
+            fill_upper = str(fill).upper()
+            stroke_upper = str(stroke).upper()
+            is_filled = 1 if fill != 'none' else 0
+            style = [14, is_filled]
+            if fill != 'none':
+                style.extend([15, fill_upper])
+            else:
+                style.extend([15, "none"])
+            if stroke != 'none':
+                style.extend([19, stroke_upper, 22, int(round(stroke_width * 508))])
+            else:
+                style.extend([19, "none"])
+
+            op = [3, obj_id, 6, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
+            resolved.append(op)
+            unresolved.append(op)
+
+        elif el_type in ('ellipse', 'circle'):
+            fill = el.get('fill', 'none') or 'none'
+            stroke = el.get('stroke', '#000000') or 'none'
+            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
+            if stroke_width is None:
+                stroke_width = 2.0
+            else:
+                stroke_width = float(stroke_width)
+
+            x_cp = int(round(float(el.get('x', 0) or 0) * 508))
+            y_cp = int(round(float(el.get('y', 0) or 0) * 508))
+            w_cp = int(round(float(el.get('width', 100) or 100) * 508))
+            h_cp = int(round(float(el.get('height', 100) or 100) * 508))
+
+            scale_x = w_cp / 120000.0
+            scale_y = h_cp / 120000.0
+            if scale_x == 0:
+                scale_x = 0.0001
+            if scale_y == 0:
+                scale_y = 0.0001
+
+            fill_upper = str(fill).upper()
+            stroke_upper = str(stroke).upper()
+            is_filled = 1 if fill != 'none' else 0
+            style = [14, is_filled]
+            if fill != 'none':
+                style.extend([15, fill_upper])
+            else:
+                style.extend([15, "none"])
+            if stroke != 'none':
+                style.extend([19, stroke_upper, 22, int(round(stroke_width * 508))])
+            else:
+                style.extend([19, "none"])
+
+            op = [3, obj_id, 8, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
+            resolved.append(op)
+            unresolved.append(op)
+
+        elif el_type in ('line', 'arrow', 'double_arrow'):
+            x1 = float(el.get('x1', 0) or 0)
+            y1 = float(el.get('y1', 0) or 0)
+            x2 = float(el.get('x2', 0) or 0)
+            y2 = float(el.get('y2', 0) or 0)
+            stroke = el.get('stroke', '#000000') or 'none'
+            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
+            if stroke_width is None:
+                stroke_width = 2.0
+            else:
+                stroke_width = float(stroke_width)
+
+            dx = x2 - x1
+            dy = y2 - y1
+
+            scale_x = (dx * 508.0) / 120000.0
+            scale_y = (dy * 508.0) / 120000.0
+            if scale_x == 0:
+                scale_x = 0.0001
+            if scale_y == 0:
+                scale_y = 0.0001
+
+            x_cp = int(round(x1 * 508))
+            y_cp = int(round(y1 * 508))
+
+            stroke_upper = str(stroke).upper()
+            stroke_width_cp = int(round(stroke_width * 508))
+            has_dash = el.get('dasharray') and el.get('dasharray') != 'none'
+
+            style = [
+                14, 0,
+                15, "#EEEEEE",
+                18, 1,
+                19, stroke_upper,
+                22, stroke_width_cp,
+                27, 1.3,
+                30, 1.3,
+                43, 2 if has_dash else 0
+            ]
+
+            if el_type == 'arrow':
+                style.extend([29, 5])
+            elif el_type == 'double_arrow':
+                style.extend([28, 5, 29, 5])
+
+            op = [3, obj_id, 153, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
+            resolved.append(op)
+            unresolved.append(op)
+
+        elif el_type == 'text':
+            text_str = str(el.get('text', '') or '')
+            color = el.get('color', '#000000') or 'none'
+            align = el.get('align', 'start')
+
+            box_w = float(el.get('width', 400) if el.get('width') is not None else 400)
+            box_h = float(el.get('height', 40) if el.get('height') is not None else (float(el.get('font_size', 16) or 16) * 2.5))
+
+            tx = float(el.get('x', 0) or 0)
+            if align in ('center', 'middle'):
+                tx = tx - (box_w / 2.0)
+            elif align in ('right', 'end'):
+                tx = tx - box_w
+            ty = float(el.get('y', 0) or 0) - (box_h / 2.0)
+
+            real_w = float(el.get('width', 333.33) if el.get('width') is not None else 333.33)
+            real_h = float(el.get('height', 37.5) if el.get('height') is not None else 37.5)
+
+            x_cp = int(round(tx * 508))
+            y_cp = int(round(ty * 508))
+            w_cp = int(round(real_w * 508))
+            h_cp = int(round(real_h * 508))
+
+            scale_x = w_cp / 100000.0
+            scale_y = h_cp / 100000.0
+            if scale_x == 0:
+                scale_x = 0.0001
+            if scale_y == 0:
+                scale_y = 0.0001
+
+            style = [44, 0]
+            op = [3, obj_id, 108, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
+            resolved.append(op)
+            unresolved.append(op)
+
+            if text_str:
+                n_chars = len(text_str)
+
+                text_op = [15, obj_id, None, 0, text_str]
+                resolved.append(text_op)
+                unresolved.append(text_op)
+
+                align_val = 1
+                if align in ('center', 'middle'):
+                    align_val = 2
+                elif align in ('right', 'end'):
+                    align_val = 3
+                align_op = [17, obj_id, None, n_chars, n_chars + 1, [], [12, align_val]]
+                resolved.append(align_op)
+                unresolved.append(align_op)
+
+                typography_props = []
+                if el.get('bold'):
+                    typography_props.extend([0, 1])
+                if el.get('italic'):
+                    typography_props.extend([1, 1])
+                if color and color != 'none':
+                    typography_props.extend([4, str(color).upper()])
+                typography_props.extend([5, font_family or el.get('fontFamily') or "Ubuntu"])
+                
+                raw_font_size = el.get('font_size', el.get('fontSize', 16))
+                font_size = int(round(float(raw_font_size) if raw_font_size is not None else 16))
+                typography_props.extend([6, font_size])
+
+                typography_op = [17, obj_id, None, 0, n_chars + 1, [], typography_props]
+                resolved.append(typography_op)
+                unresolved.append(typography_op)
+
+                autotext_key = json.dumps({"shapeId": obj_id}, separators=(',', ':'))
+                autotext_content[autotext_key] = {}
+
+        elif el_type == 'group':
+            children = el.get('childrenObjectIds', [])
+            op = [2, obj_id, children, [1, 0, 0, 1, 0, 0], "p"]
+            resolved.append(op)
+            unresolved.append(op)
+
+    flat_payload = {
+        "resolved": resolved,
+        "unresolved": unresolved,
+        "autotext_content": autotext_content,
+        "did_remove_empty_picture_placeholders": False,
+        "copy_source_supports_inheritance_via_master": True
+    }
+    flat_str = json.dumps(flat_payload, separators=(',', ':'))
+
+    wrapped_payload = {
+        "dih": 1245482604,
+        "data": flat_str,
+        "edi": "kBeECgZrwyN4Pk3CGalAkiIcibCHBxM0-dGHUMnfHDgyvkMYVZ_pxB9fogazgDhzNcbMktVjXdXLwpNCRHaU0vvKDDCQIvYzhuttxtQqAThS",
+        "edrk": "We7cOKI5bHNbFvbICo1cgW8xvwoMCQ_DEW3hRvkC3-q7k9z-tw..",
+        "dct": "punch",
+        "ds": False,
+        "cses": False,
+        "sm": "other"
+    }
+    wrapped_str = json.dumps(wrapped_payload, separators=(',', ':'))
+
+    return {
+        "flat": flat_str,
+        "wrapped": wrapped_str
+    }
+
+@app.route('/api/compile_clipboard', methods=['POST'])
+def compile_clipboard():
+    logger.info("Received request to compile clipboard GWT payload.")
+    data = request.json or {}
+    elements = data.get("elements", [])
+    font_family = data.get("fontFamily", "Ubuntu")
+    
+    try:
+        compiled = convert_to_google_slides_json(elements, font_family)
+        import uuid
+        clip_id = f"2519a9aa-7fff-ab00-1255-{uuid.uuid4().hex[:12]}"
+        
+        return jsonify({
+            "success": True,
+            "flat": compiled["flat"],
+            "wrapped": compiled["wrapped"],
+            "clip_id": clip_id
+        })
+    except Exception as e:
+        logger.error(f"Failed to compile clipboard payload: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # Read the entire systems analysis file as prompt context
 systems_analysis_content = ""
 try:
