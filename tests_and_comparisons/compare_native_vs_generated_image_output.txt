@@ -1,0 +1,361 @@
+=== DRAWING FLAT DIFF (native vs generated) ===
+{
+  "autotext_content": {},
+  "copy_source_supports_inheritance_via_master": true,
+  "did_remove_empty_picture_placeholders": false,
+  "resolved": [
+    [
+      3,
+      "slide_c1050e194a62_element_1021_text",
+      3,
+      [
+        296.7308,
+        0,
+        0,
+        296.7498,
+        138393.336,
+        40410.7203
+      ],
+      [
+        15,
+        "#EEEEEE",
+        177,
+        0,
+        19,
+        "#595959",
+        22,
+        381,
+        39,
+        "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+        49,
+        "s-blob-v1-IMAGE-fFuVjqVvxLQ",
+        8,
+        260,
+        9,
+        54
+      ],
+      "p"
+    ]
+  ],
+  "unresolved": [
+    [
+      3,
+      "slide_c1050e194a62_element_1021_text",
+      3,
+      [
+        296.7308,
+        0,
+        0,
+        296.7498,
+        138393.336,
+        40410.7203
+      ],
+      [
+        15,
+        [
+          null,
+          4
+        ],
+        177,
+        0,
+        19,
+        [
+          null,
+          3
+        ],
+        22,
+        381,
+        39,
+        "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+        49,
+        "s-blob-v1-IMAGE-fFuVjqVvxLQ",
+        8,
+        260,
+        9,
+        54
+      ],
+      "slide_c1050e194a62"
+    ]
+  ]
+}
+---
+{
+  "autotext_content": {},
+  "copy_source_supports_inheritance_via_master": true,
+  "did_remove_empty_picture_placeholders": false,
+  "resolved": [
+    [
+      3,
+      "slide_c1050e194a62_element_1021_text",
+      3,
+      [
+        296.7308,
+        0,
+        0,
+        296.7498,
+        138393,
+        40411
+      ],
+      [
+        15,
+        "#EEEEEE",
+        177,
+        0,
+        19,
+        "#595959",
+        22,
+        381,
+        39,
+        "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+        49,
+        "s-blob-v1-IMAGE-564d20b3d276",
+        8,
+        260,
+        9,
+        54
+      ],
+      "p"
+    ]
+  ],
+  "unresolved": [
+    [
+      3,
+      "slide_c1050e194a62_element_1021_text",
+      3,
+      [
+        296.7308,
+        0,
+        0,
+        296.7498,
+        138393,
+        40411
+      ],
+      [
+        15,
+        "#EEEEEE",
+        177,
+        0,
+        19,
+        "#595959",
+        22,
+        381,
+        39,
+        "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+        49,
+        "s-blob-v1-IMAGE-564d20b3d276",
+        8,
+        260,
+        9,
+        54
+      ],
+      "p"
+    ]
+  ]
+}
+
+=== DOCUMENT SLICE DIFF ===
+{
+  "autotext_content": {},
+  "resolved": {
+    "dsl_drawingrevisionaccesstokenmap": {},
+    "dsl_entitymap": {
+      "kix.hzwakpos6dqe": {
+        "ee_eo": {
+          "eo_ad": null,
+          "eo_at": null,
+          "eo_bo": {
+            "ln_c2": {
+              "clr_type": 0,
+              "hclr_color": "#000000"
+            },
+            "ln_s": 0,
+            "ln_w": 0
+          },
+          "eo_hb": false,
+          "eo_lco": {
+            "lc_cs": "",
+            "lc_ct": 0,
+            "lc_oi": "",
+            "lc_sci": "",
+            "lc_srk": ""
+          },
+          "eo_mb": 1.5,
+          "eo_ml": 1.5,
+          "eo_mr": 1.5,
+          "eo_mt": 1.5,
+          "eo_rtd": "",
+          "eo_rtdf": {
+            "rdf_ft": 0
+          },
+          "eo_type": 0,
+          "i_bri": 0,
+          "i_cid": "s-blob-v1-IMAGE-fFuVjqVvxLQ",
+          "i_clst": {
+            "cv": {
+              "op": "set",
+              "opValue": []
+            }
+          },
+          "i_cont": 0,
+          "i_crop": {
+            "crop_hr": 1,
+            "crop_oxr": 0,
+            "crop_oyr": 0,
+            "crop_rot": 0,
+            "crop_wr": 1
+          },
+          "i_ht": 31.54427007874015,
+          "i_iw": false,
+          "i_iwc": {
+            "iwc_w": false
+          },
+          "i_msct": 0,
+          "i_opa": 1,
+          "i_pid": null,
+          "i_rot": 0,
+          "i_src": "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+          "i_wth": 151.87009448818898
+        }
+      }
+    },
+    "dsl_entitypositionmap": {
+      "inline": [
+        [
+          "kix.hzwakpos6dqe"
+        ]
+      ]
+    },
+    "dsl_entitytypemap": {
+      "kix.hzwakpos6dqe": "inline"
+    },
+    "dsl_metastyleslices": [],
+    "dsl_nestedmodelmap": {},
+    "dsl_relateddocslices": {},
+    "dsl_spacers": "*",
+    "dsl_styleslices": [],
+    "dsl_suggesteddeletions": {
+      "sgsl_sugg": []
+    },
+    "dsl_suggestedinsertions": {
+      "sgsl_sugg": []
+    }
+  }
+}
+---
+{
+  "autotext_content": {},
+  "resolved": {
+    "dsl_drawingrevisionaccesstokenmap": {},
+    "dsl_entitymap": {
+      "kix.ee50dc00d92e": {
+        "ee_eo": {
+          "eo_ad": null,
+          "eo_at": null,
+          "eo_bo": {
+            "ln_c2": {
+              "clr_type": 0,
+              "hclr_color": "#000000"
+            },
+            "ln_s": 0,
+            "ln_w": 0
+          },
+          "eo_hb": false,
+          "eo_lco": {
+            "lc_cs": "",
+            "lc_ct": 0,
+            "lc_oi": "",
+            "lc_sci": "",
+            "lc_srk": ""
+          },
+          "eo_mb": 1.5,
+          "eo_ml": 1.5,
+          "eo_mr": 1.5,
+          "eo_mt": 1.5,
+          "eo_rtd": "",
+          "eo_rtdf": {
+            "rdf_ft": 0
+          },
+          "eo_type": 0,
+          "i_bri": 0,
+          "i_cid": "s-blob-v1-IMAGE-564d20b3d276",
+          "i_clst": {
+            "cv": {
+              "op": "set",
+              "opValue": []
+            }
+          },
+          "i_cont": 0,
+          "i_crop": {
+            "crop_hr": 1,
+            "crop_oxr": 0,
+            "crop_oyr": 0,
+            "crop_rot": 0,
+            "crop_wr": 1
+          },
+          "i_ht": 31.54427007874016,
+          "i_iw": false,
+          "i_iwc": {
+            "iwc_w": false
+          },
+          "i_msct": 0,
+          "i_opa": 1,
+          "i_pid": null,
+          "i_rot": 0,
+          "i_src": "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download",
+          "i_wth": 151.87009448818898
+        }
+      }
+    },
+    "dsl_entitypositionmap": {
+      "inline": [
+        [
+          "kix.ee50dc00d92e"
+        ]
+      ]
+    },
+    "dsl_entitytypemap": {
+      "kix.ee50dc00d92e": "inline"
+    },
+    "dsl_metastyleslices": [],
+    "dsl_nestedmodelmap": {},
+    "dsl_relateddocslices": {},
+    "dsl_spacers": "*",
+    "dsl_styleslices": [],
+    "dsl_suggesteddeletions": {
+      "sgsl_sugg": []
+    },
+    "dsl_suggestedinsertions": {
+      "sgsl_sugg": []
+    }
+  }
+}
+
+=== IMAGE CLIP DIFF ===
+{
+  "cosmo_ids": {
+    "s-blob-v1-IMAGE-fFuVjqVvxLQ": 1
+  },
+  "image_urls": {
+    "s-blob-v1-IMAGE-fFuVjqVvxLQ": null
+  },
+  "placeholder_ids": {}
+}
+---
+{
+  "cosmo_ids": {
+    "s-blob-v1-IMAGE-564d20b3d276": 1
+  },
+  "image_urls": {
+    "s-blob-v1-IMAGE-564d20b3d276": "https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download"
+  },
+  "placeholder_ids": {}
+}
+
+=== WRAPPER META DIFF ===
+Traceback (most recent call last):
+  File "C:\Users\joost\Desktop\code\leerlevels\figuremaker\compare_native_vs_generated_image.py", line 66, in <module>
+    nw = json.loads(native[key])
+  File "C:\Python314\Lib\json\__init__.py", line 345, in loads
+    raise TypeError(f'the JSON object must be str, bytes or bytearray, '
+                    f'not {s.__class__.__name__}')
+TypeError: the JSON object must be str, bytes or bytearray, not dict

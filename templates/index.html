@@ -810,6 +810,36 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Accordion 8: LaTeX Equations Copy Panel -->
+                    <div v-if="renderedLatexImages.length > 0" class="border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all">
+                        <button @click="toggleSection('latexEquations')" class="w-full bg-white hover:bg-gray-50/70 px-4 py-3.5 flex justify-between items-center font-semibold text-sm border-b border-gray-100 text-left">
+                            <span class="flex items-center gap-2.5 text-gray-700">
+                                <i class="fa-solid fa-square-root-variable text-brand-blue w-4"></i>
+                                LaTeX Equations (Copy/Drag SVG)
+                            </span>
+                            <i class="fa-solid" :class="activeSections.latexEquations ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="activeSections.latexEquations" class="p-4 bg-gray-50/40 space-y-3 text-xs">
+                            <p class="text-gray-500 mb-2 leading-relaxed">
+                                Copy the native shapes using the main button first. Then, **right-click -> Copy Image** or **drag-and-drop** the transparent SVG equations below directly into Google Slides!
+                            </p>
+                            <div v-for="(img, idx) in renderedLatexImages" :key="idx" class="p-3 bg-white border border-gray-200 rounded-lg flex flex-col gap-2 shadow-sm items-center">
+                                <div class="w-full text-left font-mono text-[10px] text-gray-400 select-all font-semibold truncate border-b border-gray-100 pb-1">
+                                    [[ img.text ]]
+                                </div>
+                                <!-- Rendered SVG Image -->
+                                <div class="bg-gray-50 p-3 rounded border border-gray-150 flex items-center justify-center min-h-[60px] w-full relative">
+                                    <img v-if="img.svg_base64" :src="'data:image/svg+xml;base64,' + img.svg_base64" class="max-h-20 select-all cursor-grab active:cursor-grabbing" alt="Rendered LaTeX SVG" title="Right click -> Copy Image, or Drag to Google Slides!" />
+                                    <img v-else-if="img.png_base64" :src="'data:image/png;base64,' + img.png_base64" class="max-h-20 select-all cursor-grab active:cursor-grabbing" alt="Rendered LaTeX PNG" title="Right click -> Copy Image, or Drag to Google Slides!" />
+                                    <span v-else class="text-gray-400">Rendering...</span>
+                                </div>
+                                <button @click="copyLaTeXImageDirect(img)" class="w-full py-1.5 bg-brand-blue hover:bg-blue-800 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm text-[11px]">
+                                    <i class="fa-solid fa-copy"></i> Copy as PNG
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </aside>
 
@@ -1072,7 +1102,8 @@
                     hatches: false,
                     markers: false,
                     lines: false,
-                    textLabels: false
+                    textLabels: false,
+                    latexEquations: true
                 });
 
                 const selectedPreset = ref('sinusoidal');
@@ -1165,6 +1196,9 @@
                     } else if (newVal.type === 'info') {
                         statusClass.value = 'bg-blue-100 text-blue-800 border border-blue-200 animate-pulse';
                         statusIcon.value = 'fa-solid fa-spinner fa-spin text-blue-600';
+                    } else if (newVal.type === 'warning') {
+                        statusClass.value = 'bg-yellow-100 text-yellow-800 border border-yellow-200 shadow-sm';
+                        statusIcon.value = 'fa-solid fa-triangle-exclamation text-yellow-600';
                     } else {
                         statusClass.value = '';
                         statusIcon.value = '';
@@ -1281,6 +1315,52 @@
                     });
                 };
                 const removeTextLabel = (idx) => { config.textLabels.splice(idx, 1); };
+
+                const renderedLatexImages = ref([]);
+                const loadLatexImages = async () => {
+                    const elements = config.textLabels.filter(lbl => lbl.isLatex);
+                    if (elements.length === 0) {
+                        renderedLatexImages.value = [];
+                        return;
+                    }
+                    try {
+                        const response = await fetch('/api/compile_latex_images', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ elements: elements })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            renderedLatexImages.value = data.images || [];
+                        }
+                    } catch (err) {
+                        console.error('Failed to pre-render LaTeX images:', err);
+                    }
+                };
+
+                // Watch config.textLabels to automatically pre-render their images for the panel
+                watch(() => config.textLabels, () => {
+                    loadLatexImages();
+                }, { deep: true });
+
+                const copyLaTeXImageDirect = async (img) => {
+                    status.loading = true;
+                    status.message = `Copying LaTeX "${img.text}" to clipboard...`;
+                    status.type = 'info';
+                    try {
+                        const bytes = Uint8Array.from(atob(img.png_base64), c => c.charCodeAt(0));
+                        const blob = new Blob([bytes], { type: 'image/png' });
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                        status.type = 'success';
+                        status.message = `LaTeX equation "${img.text}" copied as high-res transparent PNG! Paste in Google Slides with Ctrl+V.`;
+                    } catch (err) {
+                        status.type = 'error';
+                        status.message = `Copy failed: ${err.message}`;
+                        console.error('LaTeX copy failed:', err);
+                    } finally {
+                        status.loading = false;
+                    }
+                };
 
                 // PRESETS BUILDER
                 const loadPreset = () => {
@@ -1543,6 +1623,7 @@
                     }
                     
                     drawLivePreview();
+                    loadLatexImages();
                 };
 
                 // MATH EVALUATION WRAPPERS
@@ -2321,7 +2402,6 @@
                     if (config.grid.xStep > 0) {
                         let startVal = Math.ceil(viewport.xMin / config.grid.xStep) * config.grid.xStep;
                         for (let t = startVal; t <= viewport.xMax; t += config.grid.xStep) {
-                            if (t === 0.0 && !doXBreak) continue;
                             const px = mapX(t, viewport);
                             let tRounded = parseFloat(t.toFixed(4));
                             let lbl = tRounded.toString();
@@ -2332,9 +2412,9 @@
                             
                             // Align x and width to match the reference GSlides API constraint exactly
                             slideElements.push({
-                                type: "text", x: px - 33.33, y: pyAxisLabel + 20, text: lbl,
+                                type: "text", x: px, y: pyAxisLabel + 20, text: lbl,
                                 font_size: 16, color: '#000000', align: 'center',
-                                width: 333.33, height: 37.5
+                                width: 60.0, height: 20.0
                             });
                         }
                     }
@@ -2345,20 +2425,18 @@
                     if (config.grid.yStep > 0) {
                         let startVal = Math.ceil(viewport.yMin / config.grid.yStep) * config.grid.yStep;
                         for (let v = startVal; v <= viewport.yMax; v += config.grid.yStep) {
-                            if (v === 0.0 && !doYBreak) continue;
                             const py = mapY(v, viewport);
                             let vRounded = parseFloat(v.toFixed(4));
                             let lbl = vRounded.toString();
                             if (config.grid.dutchComma) {
-                                lbl = lbl.replace('.', ',');
+                                  lbl = lbl.replace('.', ',');
                             }
                             ctx.fillText(lbl, pxAxisLabel - 15, py);
                             
-                            // Align x and width to match the reference GSlides API constraint exactly
                             slideElements.push({
-                                type: "text", x: pxAxisLabel - 15 - 66.67, y: py, text: lbl,
+                                type: "text", x: pxAxisLabel - 15, y: py, text: lbl,
                                 font_size: 16, color: '#000000', align: 'right',
-                                width: 333.33, height: 37.5
+                                width: 60.0, height: 20.0
                             });
                         }
                     }
@@ -3272,59 +3350,96 @@
                     URL.revokeObjectURL(url);
                 };
 
-                const executeBrowserCopy = (wrapped, flat, transactionId, fallbackText) => {
-                    const interceptCopy = (event) => {
-                        event.preventDefault();
-                        const objWrapped = 'application/x-vnd.google-docs-drawings-object+wrapped';
-                        const clipIdMime = 'application/x-vnd.google-docs-internal-clip-id';
+                const executeBrowserCopy = async (wrapped, flat, transactionId, fallbackText, extraMimes = {}) => {
+                    const objWrapped = 'application/x-vnd.google-docs-drawings-object+wrapped';
+                    const docSliceWrapped = 'application/x-vnd.google-docs-document-slice-clip+wrapped';
+                    const imageClipWrapped = 'application/x-vnd.google-docs-image-clip+wrapped';
+                    const clipIdMime = 'application/x-vnd.google-docs-internal-clip-id';
+                    const fallback = fallbackText || '[Google Slides Graph Data]';
 
-                        try {
-                            event.clipboardData.setData(objWrapped, wrapped);
-                            event.clipboardData.setData(clipIdMime, transactionId);
-                            event.clipboardData.setData('text/plain', fallbackText || '[Google Slides Graph Data]');
-                            event.clipboardData.setData('text/html', `<b>${fallbackText || 'Google Slides Graph Data'}</b>`);
-                            console.log('Successfully set drawings object wrapped payload with transaction ID on clipboard event!');
-                        } catch (e) {
-                            console.error('Failed to set clipboard data:', e);
+                    const setStatus = (type, message) => {
+                        status.type = type;
+                        status.message = message;
+                        if (type === 'success') {
+                            status.url = '';
                         }
-
-                        document.removeEventListener('copy', interceptCopy);
                     };
 
-                    // Create temporary invisible selection to ensure execCommand works in Chromium
-                    const activeEl = document.activeElement;
-                    const tempTextarea = document.createElement('textarea');
-                    tempTextarea.style.position = 'fixed';
-                    tempTextarea.style.left = '-9999px';
-                    tempTextarea.style.top = '-9999px';
-                    tempTextarea.style.opacity = '0';
-                    tempTextarea.style.pointerEvents = 'none';
-                    tempTextarea.value = ' ';
-                    document.body.appendChild(tempTextarea);
-                    tempTextarea.select();
-                    tempTextarea.setSelectionRange(0, 1);
+                    const execCommandFallback = () => new Promise((resolve) => {
+                        const interceptCopy = (event) => {
+                            event.preventDefault();
+                            try {
+                                event.clipboardData.setData(objWrapped, wrapped);
+                                event.clipboardData.setData(clipIdMime, transactionId);
+                                event.clipboardData.setData('text/plain', fallback);
+                                event.clipboardData.setData('text/html', `<b>${fallback}</b>`);
+                                if (extraMimes[docSliceWrapped]) {
+                                    event.clipboardData.setData(docSliceWrapped, extraMimes[docSliceWrapped]);
+                                }
+                                if (extraMimes[imageClipWrapped]) {
+                                    event.clipboardData.setData(imageClipWrapped, extraMimes[imageClipWrapped]);
+                                }
+                            } catch (e) {
+                                console.error('Failed to set clipboard data:', e);
+                            }
+                            document.removeEventListener('copy', interceptCopy);
+                        };
 
-                    document.addEventListener('copy', interceptCopy);
+                        const activeEl = document.activeElement;
+                        const tempTextarea = document.createElement('textarea');
+                        tempTextarea.style.position = 'fixed';
+                        tempTextarea.style.left = '-9999px';
+                        tempTextarea.style.top = '-9999px';
+                        tempTextarea.style.opacity = '0';
+                        tempTextarea.style.pointerEvents = 'none';
+                        tempTextarea.value = ' ';
+                        document.body.appendChild(tempTextarea);
+                        tempTextarea.select();
+                        tempTextarea.setSelectionRange(0, 1);
+
+                        document.addEventListener('copy', interceptCopy);
+                        try {
+                            resolve(document.execCommand('copy'));
+                        } catch (err) {
+                            console.error('execCommand copy failed:', err);
+                            resolve(false);
+                        } finally {
+                            document.removeEventListener('copy', interceptCopy);
+                            document.body.removeChild(tempTextarea);
+                            if (activeEl) {
+                                activeEl.focus();
+                            }
+                        }
+                    });
 
                     try {
-                        const success = document.execCommand('copy');
-                        if (success) {
-                            status.type = 'success';
-                            status.message = 'Graph copied to clipboard as Google Slides shapes! Go to Google Slides and press Ctrl+V to paste.';
-                            status.url = '';
-                        } else {
-                            status.type = 'error';
-                            status.message = 'Browser rejected the copy command execution.';
+                        if (navigator.clipboard && navigator.clipboard.write) {
+                            const clipTypes = {
+                                [objWrapped]: new Blob([wrapped], { type: objWrapped }),
+                                [clipIdMime]: new Blob([transactionId], { type: clipIdMime }),
+                                'text/plain': new Blob([fallback], { type: 'text/plain' }),
+                                'text/html': new Blob([`<b>${fallback}</b>`], { type: 'text/html' })
+                            };
+                            if (extraMimes[docSliceWrapped]) {
+                                clipTypes[docSliceWrapped] = new Blob([extraMimes[docSliceWrapped]], { type: docSliceWrapped });
+                            }
+                            if (extraMimes[imageClipWrapped]) {
+                                clipTypes[imageClipWrapped] = new Blob([extraMimes[imageClipWrapped]], { type: imageClipWrapped });
+                            }
+                            const item = new ClipboardItem(clipTypes);
+                            await navigator.clipboard.write([item]);
+                            setStatus('success', 'Graph copied to clipboard as Google Slides shapes! Go to Google Slides and press Ctrl+V to paste.');
+                            return;
                         }
                     } catch (err) {
-                        status.type = 'error';
-                        status.message = `Copy failed: ${err.message}`;
-                    } finally {
-                        document.removeEventListener('copy', interceptCopy);
-                        document.body.removeChild(tempTextarea);
-                        if (activeEl) {
-                            activeEl.focus();
-                        }
+                        console.warn('navigator.clipboard.write failed, falling back to execCommand:', err);
+                    }
+
+                    const success = await execCommandFallback();
+                    if (success) {
+                        setStatus('success', 'Graph copied to clipboard as Google Slides shapes! Go to Google Slides and press Ctrl+V to paste.');
+                    } else {
+                        setStatus('error', 'Browser rejected the copy command execution.');
                     }
                 };
 
@@ -3355,7 +3470,18 @@
                         });
                         const data = await response.json();
                         if (data.success) {
-                            executeBrowserCopy(data.wrapped, data.flat, data.clip_id, '[Google Slides Graph Data]');
+                            const extraMimes = {};
+                            if (data.document_slice_wrapped) {
+                                extraMimes['application/x-vnd.google-docs-document-slice-clip+wrapped'] = data.document_slice_wrapped;
+                            }
+                            if (data.image_clip_wrapped) {
+                                extraMimes['application/x-vnd.google-docs-image-clip+wrapped'] = data.image_clip_wrapped;
+                            }
+                            await executeBrowserCopy(data.wrapped, data.flat, data.clip_id, '[Google Slides Graph Data]', extraMimes);
+                            if (data.warning) {
+                                status.type = 'warning';
+                                status.message = data.warning;
+                            }
                         } else {
                             status.type = 'error';
                             status.message = `Compilation failed: ${data.error}`;
@@ -3401,7 +3527,7 @@
                         });
                         const data = await response.json();
                         if (data.success) {
-                            executeBrowserCopy(data.wrapped, data.flat, data.clip_id, '[Google Slides Rect]');
+                            await executeBrowserCopy(data.wrapped, data.flat, data.clip_id, '[Google Slides Rect]', {});
                         } else {
                             status.type = 'error';
                             status.message = `Compilation failed: ${data.error}`;
@@ -3423,6 +3549,7 @@
                 onMounted(() => {
                     loadPreset();
                     checkAuthStatus();
+                    loadLatexImages();
 
                     // Global paste event listener for debugging Google Slides payloads
                     document.addEventListener('paste', (event) => {
@@ -3564,6 +3691,9 @@
                     removeLine,
                     addTextLabel,
                     removeTextLabel,
+                    renderedLatexImages,
+                    loadLatexImages,
+                    copyLaTeXImageDirect,
                     loadPreset,
                     exportToPresentation,
                     appendSlideToPresentation,

@@ -4,11 +4,23 @@ import tempfile
 import traceback
 import logging
 import json
+import uuid
+import base64
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from dotenv import load_dotenv
 import google_auth_oauthlib.flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from slides_builder import SlidesBuilder
+
+# Optional LaTeX renderer used for clipboard image equations.
+try:
+    from graph_engine import compile_latex_to_png, compile_latex_to_svg
+    LATEX_RENDERER_AVAILABLE = True
+except (ImportError, FileNotFoundError):
+    compile_latex_to_png = None
+    compile_latex_to_svg = None
+    LATEX_RENDERER_AVAILABLE = False
 
 # Allow insecure transport for local development (OAuth over HTTP)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -235,7 +247,52 @@ def list_folders():
         logger.error(f"Error listing folders: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-def convert_to_google_slides_json(elements, font_family='Ubuntu'):
+def _image_dimensions(local_path):
+    """Return (width, height) in pixels for an image file."""
+    from PIL import Image
+    with Image.open(local_path) as img:
+        return img.width, img.height
+
+
+def _upload_image_to_drive(local_path, creds, folder_id=None, mime_type='image/png'):
+    """
+    Upload a local image to Google Drive, make it publicly readable, and return
+    a direct download URL. Tries the Drive API webContentLink first, then falls
+    back to the usercontent.google.com direct download URL.
+    """
+    from googleapiclient.http import MediaFileUpload
+
+    drive_service = build('drive', 'v3', credentials=creds)
+    file_metadata = {
+        'name': os.path.basename(local_path),
+        'mimeType': mime_type,
+        'parents': [folder_id] if folder_id else []
+    }
+    media = MediaFileUpload(local_path, mimetype=mime_type)
+    drive_file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id'
+    ).execute()
+    file_id = drive_file.get('id')
+
+    drive_service.permissions().create(
+        fileId=file_id,
+        body={'role': 'reader', 'type': 'anyone'}
+    ).execute()
+
+    # Re-fetch to get the canonical direct download link used by Drive.
+    file_metadata = drive_service.files().get(
+        fileId=file_id,
+        fields='webContentLink'
+    ).execute()
+    web_content_link = file_metadata.get('webContentLink')
+    if web_content_link:
+        return web_content_link
+    return f"https://drive.usercontent.google.com/download?id={file_id}&export=download"
+
+
+def convert_to_google_slides_json(elements, font_family='Ubuntu', include_latex=True):
     if not elements:
         return {
             "flat": json.dumps({"resolved": [], "unresolved": []}),
@@ -287,241 +344,123 @@ def convert_to_google_slides_json(elements, font_family='Ubuntu'):
     valid_elements = [el for el in elements if el is not None]
     sorted_elements = sorted(valid_elements, key=get_element_z_index)
 
-    resolved = []
-    unresolved = []
-    autotext_content = {}
+    builder = SlidesBuilder(font_family=font_family)
 
     for index, el in enumerate(sorted_elements):
         el_type = el.get('type')
         obj_id = el.get('id') or el.get('objectId') or f"element_{index}_{el_type}"
 
         if el_type == 'rect':
-            fill = el.get('fill', 'none') or 'none'
-            stroke = el.get('stroke', '#000000') or 'none'
-            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
-            if stroke_width is None:
-                stroke_width = 2.0
-            else:
-                stroke_width = float(stroke_width)
-
-            x_cp = int(round(float(el.get('x', 0) or 0) * 508))
-            y_cp = int(round(float(el.get('y', 0) or 0) * 508))
-            w_cp = int(round(float(el.get('width', 100) or 100) * 508))
-            h_cp = int(round(float(el.get('height', 100) or 100) * 508))
-
-            scale_x = w_cp / 10000.0
-            scale_y = h_cp / 10000.0
-            if scale_x == 0:
-                scale_x = 0.0001
-            if scale_y == 0:
-                scale_y = 0.0001
-
-            fill_upper = str(fill).upper()
-            stroke_upper = str(stroke).upper()
-            is_filled = 1 if fill != 'none' else 0
-            style = [14, is_filled]
-            if fill != 'none':
-                style.extend([15, fill_upper])
-            else:
-                style.extend([15, "none"])
-            if stroke != 'none':
-                style.extend([19, stroke_upper, 22, int(round(stroke_width * 508))])
-            else:
-                style.extend([19, "none"])
-
-            op = [3, obj_id, 6, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
-            resolved.append(op)
-            unresolved.append(op)
-
+            builder.add_rect(
+                x=el.get('x', 0),
+                y=el.get('y', 0),
+                width=el.get('width', 100),
+                height=el.get('height', 100),
+                fill=el.get('fill', 'none'),
+                stroke=el.get('stroke', '#000000'),
+                stroke_width=el.get('stroke_width', el.get('strokeWidth', 2.0)),
+                obj_id=obj_id,
+            )
         elif el_type in ('ellipse', 'circle'):
-            fill = el.get('fill', 'none') or 'none'
-            stroke = el.get('stroke', '#000000') or 'none'
-            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
-            if stroke_width is None:
-                stroke_width = 2.0
-            else:
-                stroke_width = float(stroke_width)
-
-            x_cp = int(round(float(el.get('x', 0) or 0) * 508))
-            y_cp = int(round(float(el.get('y', 0) or 0) * 508))
-            w_cp = int(round(float(el.get('width', 100) or 100) * 508))
-            h_cp = int(round(float(el.get('height', 100) or 100) * 508))
-
-            scale_x = w_cp / 120000.0
-            scale_y = h_cp / 120000.0
-            if scale_x == 0:
-                scale_x = 0.0001
-            if scale_y == 0:
-                scale_y = 0.0001
-
-            fill_upper = str(fill).upper()
-            stroke_upper = str(stroke).upper()
-            is_filled = 1 if fill != 'none' else 0
-            style = [14, is_filled]
-            if fill != 'none':
-                style.extend([15, fill_upper])
-            else:
-                style.extend([15, "none"])
-            if stroke != 'none':
-                style.extend([19, stroke_upper, 22, int(round(stroke_width * 508))])
-            else:
-                style.extend([19, "none"])
-
-            op = [3, obj_id, 8, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
-            resolved.append(op)
-            unresolved.append(op)
-
+            builder.add_ellipse(
+                x=el.get('x', 0),
+                y=el.get('y', 0),
+                width=el.get('width', 100),
+                height=el.get('height', 100),
+                fill=el.get('fill', 'none'),
+                stroke=el.get('stroke', '#000000'),
+                stroke_width=el.get('stroke_width', el.get('strokeWidth', 2.0)),
+                obj_id=obj_id,
+            )
         elif el_type in ('line', 'arrow', 'double_arrow'):
-            x1 = float(el.get('x1', 0) or 0)
-            y1 = float(el.get('y1', 0) or 0)
-            x2 = float(el.get('x2', 0) or 0)
-            y2 = float(el.get('y2', 0) or 0)
-            stroke = el.get('stroke', '#000000') or 'none'
-            stroke_width = el.get('stroke_width', el.get('strokeWidth', 2.0))
-            if stroke_width is None:
-                stroke_width = 2.0
-            else:
-                stroke_width = float(stroke_width)
-
-            dx = x2 - x1
-            dy = y2 - y1
-
-            scale_x = (dx * 508.0) / 120000.0
-            scale_y = (dy * 508.0) / 120000.0
-            if scale_x == 0:
-                scale_x = 0.0001
-            if scale_y == 0:
-                scale_y = 0.0001
-
-            x_cp = int(round(x1 * 508))
-            y_cp = int(round(y1 * 508))
-
-            stroke_upper = str(stroke).upper()
-            stroke_width_cp = int(round(stroke_width * 508))
-            has_dash = el.get('dasharray') and el.get('dasharray') != 'none'
-
-            style = [
-                14, 0,
-                15, "#EEEEEE",
-                18, 1,
-                19, stroke_upper,
-                22, stroke_width_cp,
-                27, 1.3,
-                30, 1.3,
-                43, 2 if has_dash else 0
-            ]
-
-            if el_type == 'arrow':
-                style.extend([29, 5])
-            elif el_type == 'double_arrow':
-                style.extend([28, 5, 29, 5])
-
-            op = [3, obj_id, 153, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
-            resolved.append(op)
-            unresolved.append(op)
-
+            builder.add_line(
+                x1=el.get('x1', 0),
+                y1=el.get('y1', 0),
+                x2=el.get('x2', 0),
+                y2=el.get('y2', 0),
+                stroke=el.get('stroke', '#000000'),
+                stroke_width=el.get('stroke_width', el.get('strokeWidth', 2.0)),
+                dasharray=el.get('dasharray'),
+                arrow_start=(el_type == 'double_arrow'),
+                arrow_end=(el_type in ('arrow', 'double_arrow')),
+                obj_id=obj_id,
+            )
         elif el_type == 'text':
-            text_str = str(el.get('text', '') or '')
-            color = el.get('color', '#000000') or 'none'
-            align = el.get('align', 'start')
+            is_latex = bool(el.get('is_latex') or el.get('isLatex'))
+            if is_latex and not include_latex:
+                continue
+            text = str(el.get('text', ''))
 
-            box_w = float(el.get('width', 400) if el.get('width') is not None else 400)
-            box_h = float(el.get('height', 40) if el.get('height') is not None else (float(el.get('font_size', 16) or 16) * 2.5))
+            if is_latex and LATEX_RENDERER_AVAILABLE:
+                try:
+                    font_size = float(el.get('font_size', el.get('fontSize', 16)) or 16)
+                    color = el.get('color', '#000000') or '#000000'
+                    align = el.get('align', 'start') or 'start'
+                    mask_bg = bool(el.get('mask_bg') or el.get('maskBg'))
 
-            tx = float(el.get('x', 0) or 0)
-            if align in ('center', 'middle'):
-                tx = tx - (box_w / 2.0)
-            elif align in ('right', 'end'):
-                tx = tx - box_w
-            ty = float(el.get('y', 0) or 0) - (box_h / 2.0)
+                    latex_meta = compile_latex_to_png(text, font_size, color, align, group_id=obj_id)
+                    if latex_meta:
+                        local_path = latex_meta['local_path']
 
-            real_w = float(el.get('width', 333.33) if el.get('width') is not None else 333.33)
-            real_h = float(el.get('height', 37.5) if el.get('height') is not None else 37.5)
+                        # Google Slides does not accept data URLs for pasted
+                        # images; upload to Drive when the user is logged in.
+                        creds = get_credentials()
+                        if not creds:
+                            logger.info(f"No Google credentials; skipping image LaTeX for '{text}'.")
+                            raise RuntimeError("Google login required for LaTeX image paste")
 
-            x_cp = int(round(tx * 508))
-            y_cp = int(round(ty * 508))
-            w_cp = int(round(real_w * 508))
-            h_cp = int(round(real_h * 508))
+                        image_url = _upload_image_to_drive(
+                            local_path, creds,
+                            folder_id=os.environ.get('DRIVE_FOLDER_ID'),
+                            mime_type='image/png'
+                        )
 
-            scale_x = w_cp / 100000.0
-            scale_y = h_cp / 100000.0
-            if scale_x == 0:
-                scale_x = 0.0001
-            if scale_y == 0:
-                scale_y = 0.0001
+                        img_w = latex_meta['width']
+                        img_h = latex_meta['height']
+                        tx = float(el.get('x', 0)) + latex_meta['x_offset']
+                        ty = float(el.get('y', 0)) + latex_meta['y_offset']
+                        native_w, native_h = _image_dimensions(local_path)
 
-            style = [44, 0]
-            op = [3, obj_id, 108, [scale_x, 0, 0, scale_y, x_cp, y_cp], style, "p"]
-            resolved.append(op)
-            unresolved.append(op)
+                        if mask_bg:
+                            builder.add_rect(
+                                x=tx, y=ty,
+                                width=img_w, height=img_h,
+                                fill='#FFFFFF', stroke='none',
+                                stroke_width=0,
+                                obj_id=f"{obj_id}_bg"
+                            )
 
-            if text_str:
-                n_chars = len(text_str)
+                        builder.add_image(
+                            x=tx, y=ty,
+                            width_pt=img_w, height_pt=img_h,
+                            image_url=image_url,
+                            native_width_px=native_w,
+                            native_height_px=native_h,
+                            obj_id=obj_id
+                        )
+                        continue
+                except Exception as e:
+                    logger.error(f"Failed to render LaTeX image for '{text}': {e}")
+                    # Fall through to regular text rendering as a safe fallback.
 
-                text_op = [15, obj_id, None, 0, text_str]
-                resolved.append(text_op)
-                unresolved.append(text_op)
-
-                align_val = 1
-                if align in ('center', 'middle'):
-                    align_val = 2
-                elif align in ('right', 'end'):
-                    align_val = 3
-                align_op = [17, obj_id, None, n_chars, n_chars + 1, [], [12, align_val]]
-                resolved.append(align_op)
-                unresolved.append(align_op)
-
-                typography_props = []
-                if el.get('bold'):
-                    typography_props.extend([0, 1])
-                if el.get('italic'):
-                    typography_props.extend([1, 1])
-                if color and color != 'none':
-                    typography_props.extend([4, str(color).upper()])
-                typography_props.extend([5, font_family or el.get('fontFamily') or "Ubuntu"])
-                
-                raw_font_size = el.get('font_size', el.get('fontSize', 16))
-                font_size = int(round(float(raw_font_size) if raw_font_size is not None else 16))
-                typography_props.extend([6, font_size])
-
-                typography_op = [17, obj_id, None, 0, n_chars + 1, [], typography_props]
-                resolved.append(typography_op)
-                unresolved.append(typography_op)
-
-                autotext_key = json.dumps({"shapeId": obj_id}, separators=(',', ':'))
-                autotext_content[autotext_key] = {}
-
+            builder.add_text(
+                x=el.get('x', 0),
+                y=el.get('y', 0),
+                text=text,
+                width=el.get('width'),
+                height=el.get('height'),
+                font_size=el.get('font_size', el.get('fontSize', 16)),
+                color=el.get('color', '#000000'),
+                align=el.get('align', 'start'),
+                bold=el.get('bold'),
+                italic=el.get('italic'),
+                font_family=font_family,
+                obj_id=obj_id,
+            )
         elif el_type == 'group':
-            children = el.get('childrenObjectIds', [])
-            op = [2, obj_id, children, [1, 0, 0, 1, 0, 0], "p"]
-            resolved.append(op)
-            unresolved.append(op)
+            builder.add_group(el.get('childrenObjectIds', []), obj_id=obj_id)
 
-    flat_payload = {
-        "resolved": resolved,
-        "unresolved": unresolved,
-        "autotext_content": autotext_content,
-        "did_remove_empty_picture_placeholders": False,
-        "copy_source_supports_inheritance_via_master": True
-    }
-    flat_str = json.dumps(flat_payload, separators=(',', ':'))
-
-    wrapped_payload = {
-        "dih": 1245482604,
-        "data": flat_str,
-        "edi": "kBeECgZrwyN4Pk3CGalAkiIcibCHBxM0-dGHUMnfHDgyvkMYVZ_pxB9fogazgDhzNcbMktVjXdXLwpNCRHaU0vvKDDCQIvYzhuttxtQqAThS",
-        "edrk": "We7cOKI5bHNbFvbICo1cgW8xvwoMCQ_DEW3hRvkC3-q7k9z-tw..",
-        "dct": "punch",
-        "ds": False,
-        "cses": False,
-        "sm": "other"
-    }
-    wrapped_str = json.dumps(wrapped_payload, separators=(',', ':'))
-
-    return {
-        "flat": flat_str,
-        "wrapped": wrapped_str
-    }
+    return builder.to_punch()
 
 @app.route('/api/compile_clipboard', methods=['POST'])
 def compile_clipboard():
@@ -529,20 +468,100 @@ def compile_clipboard():
     data = request.json or {}
     elements = data.get("elements", [])
     font_family = data.get("fontFamily", "Ubuntu")
+
+    # Warn callers when LaTeX equations are present but cannot be pasted as images.
+    has_latex = any(
+        bool(el.get('is_latex') or el.get('isLatex'))
+        for el in elements if isinstance(el, dict)
+    )
+    creds = get_credentials()
+    latex_warning = None
+    if has_latex and not LATEX_RENDERER_AVAILABLE:
+        latex_warning = "LaTeX renderer is unavailable; equations copied as plain text."
+    elif has_latex and not creds:
+        latex_warning = "LaTeX equations require Google login to paste as images; equations copied as plain text."
     
     try:
-        compiled = convert_to_google_slides_json(elements, font_family)
-        import uuid
+        compiled = convert_to_google_slides_json(elements, font_family, include_latex=False)
         clip_id = f"2519a9aa-7fff-ab00-1255-{uuid.uuid4().hex[:12]}"
         
-        return jsonify({
+        response = {
             "success": True,
             "flat": compiled["flat"],
             "wrapped": compiled["wrapped"],
             "clip_id": clip_id
-        })
+        }
+        if "document_slice_wrapped" in compiled:
+            response["document_slice_wrapped"] = compiled["document_slice_wrapped"]
+        if "image_clip_wrapped" in compiled:
+            response["image_clip_wrapped"] = compiled["image_clip_wrapped"]
+        if latex_warning:
+            response["warning"] = latex_warning
+        
+        return jsonify(response)
     except Exception as e:
         logger.error(f"Failed to compile clipboard payload: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/compile_latex_images', methods=['POST'])
+def compile_latex_images():
+    """Render every LaTeX text element to a transparent PNG & SVG for raw image paste/drag."""
+    logger.info("Received request to compile LaTeX images for clipboard.")
+    data = request.json or {}
+    elements = data.get("elements", [])
+
+    if not LATEX_RENDERER_AVAILABLE or compile_latex_to_png is None:
+        return jsonify({"success": False, "error": "LaTeX renderer not available"}), 500
+
+    images = []
+    try:
+        for el in elements:
+            if not isinstance(el, dict):
+                continue
+            if not (el.get('is_latex') or el.get('isLatex')):
+                continue
+            text = str(el.get('text', ''))
+            font_size = float(el.get('font_size', el.get('fontSize', 16)) or 16)
+            color = el.get('color', '#000000') or '#000000'
+            align = el.get('align', 'start') or 'start'
+
+            # 1. Compile to PNG
+            latex_meta_png = compile_latex_to_png(text, font_size, color, align, group_id=el.get('id'))
+            if not latex_meta_png:
+                continue
+
+            with open(latex_meta_png['local_path'], 'rb') as f:
+                png_bytes = f.read()
+
+            # 2. Compile to SVG (optional/best effort)
+            svg_base64 = None
+            if compile_latex_to_svg:
+                try:
+                    latex_meta_svg = compile_latex_to_svg(text, font_size, color, align, group_id=el.get('id'))
+                    if latex_meta_svg and os.path.exists(latex_meta_svg['local_path']):
+                        with open(latex_meta_svg['local_path'], 'rb') as f:
+                            svg_bytes = f.read()
+                        svg_base64 = base64.b64encode(svg_bytes).decode('ascii')
+                except Exception as ex:
+                    logger.warning(f"Failed to render LaTeX SVG fallback: {ex}")
+
+            images.append({
+                "text": text,
+                "x": float(el.get('x', 0)),
+                "y": float(el.get('y', 0)),
+                "width": latex_meta_png['width'],
+                "height": latex_meta_png['height'],
+                "x_offset": latex_meta_png['x_offset'],
+                "y_offset": latex_meta_png['y_offset'],
+                "png_base64": base64.b64encode(png_bytes).decode('ascii'),
+                "svg_base64": svg_base64,
+            })
+
+        return jsonify({"success": True, "images": images})
+    except Exception as e:
+        logger.error(f"Failed to compile LaTeX images: {str(e)}")
         print(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 

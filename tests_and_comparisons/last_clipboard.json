@@ -1,0 +1,33 @@
+{
+  "application/x-vnd.google-docs-document-slice-clip+wrapped": {
+    "dih": 842511082,
+    "data": "{\"resolved\":{\"dsl_spacers\":\"*\",\"dsl_styleslices\":[],\"dsl_metastyleslices\":[],\"dsl_suggestedinsertions\":{\"sgsl_sugg\":[]},\"dsl_suggesteddeletions\":{\"sgsl_sugg\":[]},\"dsl_entitypositionmap\":{\"inline\":[[\"kix.hzwakpos6dqe\"]]},\"dsl_entitymap\":{\"kix.hzwakpos6dqe\":{\"ee_eo\":{\"eo_type\":0,\"i_wth\":151.87009448818898,\"i_ht\":31.54427007874015,\"eo_lco\":{\"lc_ct\":0,\"lc_sci\":\"\",\"lc_srk\":\"\",\"lc_oi\":\"\",\"lc_cs\":\"\"},\"eo_ml\":1.5,\"eo_mr\":1.5,\"eo_mt\":1.5,\"eo_mb\":1.5,\"eo_hb\":false,\"eo_bo\":{\"ln_c2\":{\"clr_type\":0,\"hclr_color\":\"#000000\"},\"ln_w\":0,\"ln_s\":0},\"eo_at\":null,\"eo_ad\":null,\"eo_rtd\":\"\",\"eo_rtdf\":{\"rdf_ft\":0},\"i_bri\":0,\"i_cont\":0,\"i_opa\":1,\"i_clst\":{\"cv\":{\"op\":\"set\",\"opValue\":[]}},\"i_cid\":\"s-blob-v1-IMAGE-fFuVjqVvxLQ\",\"i_crop\":{\"crop_oxr\":0,\"crop_oyr\":0,\"crop_wr\":1,\"crop_hr\":1,\"crop_rot\":0},\"i_rot\":0,\"i_src\":\"https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download\",\"i_iw\":false,\"i_iwc\":{\"iwc_w\":false},\"i_msct\":0,\"i_pid\":null}}},\"dsl_entitytypemap\":{\"kix.hzwakpos6dqe\":\"inline\"},\"dsl_drawingrevisionaccesstokenmap\":{},\"dsl_relateddocslices\":{},\"dsl_nestedmodelmap\":{}},\"autotext_content\":{}}",
+    "edi": "txBxPQ7cXS_ie1fR71LFM05HrdvVROiSLUBMn5EpN2-0vOtLZnRKwKN6BZ9qA-6z-Og1H6p0ULpl-waNapxpi-axnMuGF688mDHgoi_MnYh4",
+    "edrk": "1KOnq92uB57WvSR6E1DAT8_ZfsIJ0Jjm8LwwMY3JKBw8PS8iAQ..",
+    "dct": "punch",
+    "ds": false,
+    "cses": false,
+    "sm": "other"
+  },
+  "application/x-vnd.google-docs-drawings-object+wrapped": {
+    "dih": 842511082,
+    "data": "{\"resolved\":[[3,\"slide_c1050e194a62_element_1021_text\",3,[296.7308,0,0,296.7498,138393.336,40410.7203],[15,\"#EEEEEE\",177,0,19,\"#595959\",22,381,39,\"https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download\",49,\"s-blob-v1-IMAGE-fFuVjqVvxLQ\",8,260,9,54],\"p\"]],\"unresolved\":[[3,\"slide_c1050e194a62_element_1021_text\",3,[296.7308,0,0,296.7498,138393.336,40410.7203],[15,[null,4],177,0,19,[null,3],22,381,39,\"https://drive.google.com/uc?id=1d4wQ-xMRo-hgWEt_fj50GFAuXvQ_Q-Ps&export=download\",49,\"s-blob-v1-IMAGE-fFuVjqVvxLQ\",8,260,9,54],\"slide_c1050e194a62\"]],\"autotext_content\":{},\"did_remove_empty_picture_placeholders\":false,\"copy_source_supports_inheritance_via_master\":true}",
+    "edi": "IoP4tfLyRWtK7zah5OQe34db7eAsZCwonF8QQxMFAGyCDJ_NJCwP9JlVa56nhc4_Y2JYDibqv-DrungOhNB6YYsx9vFaWDJNKnEd_OvHahyq",
+    "edrk": "8uzJVq-1Z3QrXwJB79SuqcHDNmXHIbygZldM9U7HwkRjKcjGiw..",
+    "dct": "punch",
+    "ds": false,
+    "cses": false,
+    "sm": "other"
+  },
+  "application/x-vnd.google-docs-image-clip+wrapped": {
+    "dih": 842511082,
+    "data": "{\"image_urls\":{\"s-blob-v1-IMAGE-fFuVjqVvxLQ\":null},\"placeholder_ids\":{},\"cosmo_ids\":{\"s-blob-v1-IMAGE-fFuVjqVvxLQ\":1}}",
+    "edi": "ENLtnB4NhOBHjNgqlxbs9Y_L6NZPI6xpdCgWMyiMORRcWstK5uj-DzUpCIEUVdnxSlKrC5I_jFKOa-tS5GAaDGXQW_X36q5sFyQfytF1jJfy",
+    "edrk": "elZqFcdTL6GOA9Yf5AAxCLJFwCz-1fkzsf63ESolE7TQMGrjBg..",
+    "dct": "punch",
+    "ds": false,
+    "cses": false,
+    "sm": "other"
+  },
+  "application/x-vnd.google-docs-internal-clip-id": "0dfc46c0-7fff-f14e-ae11-223e574a79de"
+}

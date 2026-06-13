@@ -943,7 +943,7 @@ def numerical_derivative(func, x: float, h: float = 1e-5) -> float:
     return (func(x + h) - func(x - h)) / (2.0 * h)
 
 
-def compile_latex_to_png(latex_str: str, font_size: float, color: str, align: str = 'center', group_id: str = None) -> dict:
+def compile_latex_to_png(latex_str: str, font_size: float, color: str, align: str = 'center', group_id: str = None, dpi: float = 300) -> dict:
     """
     Compiles a LaTeX expression to a transparent PNG and returns metadata about its placement.
     Returns a dict with keys:
@@ -1016,7 +1016,7 @@ $%s$
                 "--export-filename=" + os.path.abspath(local_png_path),
                 "--export-area-drawing",
                 "--export-background-opacity=0",
-                "--export-dpi=300",
+                f"--export-dpi={dpi}",
                 svg_path
             ]
             subprocess.run(cmd_png, cwd=tmpdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
@@ -1092,4 +1092,179 @@ $%s$
     except Exception as e:
         logger.error(f"[compile_latex_to_png] LaTeX/Inkscape compilation failed with unexpected error: {e}", exc_info=True)
         print(f"[compile_latex_to_png] LaTeX/Inkscape compilation failed: {e}")
+        return None
+
+
+def compile_latex_to_svg(latex_str: str, font_size: float, color: str, align: str = 'center', group_id: str = None) -> dict:
+    """
+    Compiles a LaTeX expression to an SVG file and returns metadata about its placement.
+    This is faster than compile_latex_to_png because it skips the Inkscape rasterisation
+    step and can be used when the target supports SVG images (e.g. Google Drive + Slides).
+
+    Returns a dict with keys:
+      'local_path': str  (path to the generated .svg file)
+      'width': float
+      'height': float
+      'x_offset': float
+      'y_offset': float
+      'native_w': float
+      'native_h': float
+    Or None if compilation fails.
+    """
+    import uuid
+    if not group_id:
+        group_id = f"latex_gslides_{uuid.uuid4().hex[:8]}"
+
+    preamble_parts = []
+    for name, hex_code in COLORS.items():
+        preamble_parts.append(f"\\definecolor{{{name}}}{{HTML}}{{{hex_code.lstrip('#').upper()}}}")
+
+    extra_preamble = "\n".join(preamble_parts)
+
+    color_hex = color.lstrip('#')
+    if len(color_hex) == 3:
+        color_hex = "".join([c*2 for c in color_hex])
+
+    latex_with_color = f"\\textcolor[HTML]{{{color_hex.upper()}}}{{{latex_str}}}"
+
+    tex_template = r"""\documentclass[preview,border=4pt]{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage[utf8]{inputenx}
+\usepackage{xcolor}
+\usepackage{sfmath}
+\renewcommand{\familydefault}{\sfdefault}
+
+%s
+
+\begin{document}
+\begin{preview}
+\boldmath
+$%s$
+\end{preview}
+\end{document}
+""" % (extra_preamble, latex_with_color)
+
+    local_svg_path = os.path.join(tempfile.gettempdir(), f"latex_{group_id}.svg")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tex_path = os.path.join(tmpdir, "formula.tex")
+            with open(tex_path, "w", encoding="utf-8") as f:
+                f.write(tex_template)
+
+            # 1. Compile LaTeX to PDF
+            cmd_pdf = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "formula.tex"]
+            subprocess.run(cmd_pdf, cwd=tmpdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+            pdf_path = os.path.join(tmpdir, "formula.pdf")
+            svg_path = os.path.join(tmpdir, "formula.svg")
+
+            # 2. Convert PDF to SVG
+            cmd_svg = ["dvisvgm", "--pdf", "--no-fonts", "formula.pdf", "-o", "formula.svg"]
+            subprocess.run(cmd_svg, cwd=tmpdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+            with open(svg_path, "r", encoding="utf-8") as f:
+                svg_content = f.read()
+
+            # Persist the SVG so callers can upload it.
+            with open(local_svg_path, "w", encoding="utf-8") as f:
+                f.write(svg_content)
+
+            root = ET.fromstring(svg_content)
+
+            def strip_ns(el):
+                if el.tag.startswith('{'):
+                    el.tag = el.tag.split('}', 1)[1]
+                for key in list(el.attrib.keys()):
+                    if key.startswith('{'):
+                        new_key = key.split('}', 1)[1]
+                        el.attrib[new_key] = el.attrib.pop(key)
+                for child in el:
+                    strip_ns(child)
+            strip_ns(root)
+
+            # Determine SVG canvas size. dvisvgm outputs width/height in pt by default.
+            def parse_pt(value):
+                if value is None:
+                    return None
+                value = str(value).strip()
+                if value.endswith('pt'):
+                    value = value[:-2]
+                try:
+                    return float(value)
+                except ValueError:
+                    return None
+
+            svg_w_pt = parse_pt(root.attrib.get('width'))
+            svg_h_pt = parse_pt(root.attrib.get('height'))
+            viewbox = root.attrib.get('viewBox')
+            if viewbox:
+                vb_parts = [float(v) for v in viewbox.split()]
+                vb_w = vb_parts[2]
+                vb_h = vb_parts[3]
+            else:
+                vb_w = svg_w_pt or 100.0
+                vb_h = svg_h_pt or 100.0
+
+            native_w = svg_w_pt if svg_w_pt else vb_w
+            native_h = svg_h_pt if svg_h_pt else vb_h
+
+            path_elements = []
+            traverse_elements(root, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], path_elements)
+
+            all_pts_x = []
+            all_pts_y = []
+            for pe in path_elements:
+                d_attr = pe['d']
+                if not d_attr:
+                    continue
+                lines_list = discretize_path(d_attr, pe['matrix'])
+                for pt1, pt2 in lines_list:
+                    all_pts_x.extend([pt1[0], pt2[0]])
+                    all_pts_y.extend([pt1[1], pt2[1]])
+
+            if not all_pts_x or not all_pts_y:
+                w_tight, h_tight = vb_w, vb_h
+            else:
+                xmin, xmax = min(all_pts_x), max(all_pts_x)
+                ymin, ymax = min(all_pts_y), max(all_pts_y)
+                w_tight = xmax - xmin
+                h_tight = ymax - ymin
+
+            h_slide = font_size * 1.15
+            scale_factor = h_slide / (h_tight if h_tight > 0 else 10.0)
+            w_slide = w_tight * scale_factor
+
+            if align == 'center':
+                x_offset = - w_slide / 2.0
+            elif align in ('left', 'start'):
+                x_offset = 0.0
+            elif align in ('right', 'end'):
+                x_offset = - w_slide
+            else:
+                x_offset = - w_slide / 2.0
+
+            y_offset = - h_slide / 2.0
+
+            return {
+                'local_path': local_svg_path,
+                'width': w_slide,
+                'height': h_slide,
+                'x_offset': x_offset,
+                'y_offset': y_offset,
+                'native_w': native_w,
+                'native_h': native_h,
+            }
+
+    except subprocess.CalledProcessError as e:
+        stderr_msg = e.stderr or ""
+        if isinstance(stderr_msg, bytes):
+            stderr_msg = stderr_msg.decode('utf-8', errors='ignore')
+        logger.error(f"[compile_latex_to_svg] Subprocess failed! Command: {e.cmd}, Code: {e.returncode}, Error:\n{stderr_msg}")
+        print(f"[compile_latex_to_svg] LaTeX/dvisvgm compilation failed: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[compile_latex_to_svg] LaTeX/dvisvgm compilation failed with unexpected error: {e}", exc_info=True)
+        print(f"[compile_latex_to_svg] LaTeX/dvisvgm compilation failed: {e}")
         return None
